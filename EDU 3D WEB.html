@@ -1,0 +1,2932 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>EDU-3D | 3D Learning Lab</title>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <!-- Three.js & OrbitControls -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+  <!-- Canvas Confetti -->
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+
+  <style>
+    body {
+      font-family: 'Outfit', sans-serif;
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+      background-color: #f0f4f9;
+      color: #1e293b;
+      user-select: none;
+    }
+    .font-mono {
+      font-family: 'JetBrains Mono', monospace;
+    }
+    .glass-panel {
+      background: rgba(255, 255, 255, 0.88);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border: 1px solid rgba(186, 230, 253, 0.6);
+      box-shadow: 0 16px 40px -8px rgba(15, 23, 42, 0.08);
+    }
+    .glass-card {
+      background: rgba(240, 247, 255, 0.85);
+      backdrop-filter: blur(14px);
+      border: 1px solid rgba(224, 242, 254, 0.8);
+    }
+    ::-webkit-scrollbar {
+      width: 5px;
+      height: 5px;
+    }
+    ::-webkit-scrollbar-track {
+      background: rgba(241, 245, 249, 0.7);
+    }
+    ::-webkit-scrollbar-thumb {
+      background: rgba(148, 163, 184, 0.6);
+      border-radius: 9999px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: rgba(100, 116, 139, 0.8);
+    }
+    input[type=range] {
+      -webkit-appearance: none;
+      background: rgba(186, 230, 253, 0.6);
+      border-radius: 9999px;
+      height: 5px;
+      outline: none;
+    }
+    input[type=range]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      background: #0284c7;
+      cursor: pointer;
+      box-shadow: 0 0 10px rgba(2, 132, 199, 0.5);
+      transition: transform 0.15s ease;
+    }
+    input[type=range]::-webkit-slider-thumb:hover {
+      transform: scale(1.25);
+    }
+    #webgl-canvas {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      display: block;
+      z-index: 1;
+    }
+    #annotation-canvas {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      display: none;
+      z-index: 15;
+      cursor: crosshair;
+    }
+  </style>
+</head>
+<body class="relative w-screen h-screen overflow-hidden bg-[#f0f4f9] text-slate-800">
+
+  <!-- 3D WebGL Canvas Layer -->
+  <canvas id="webgl-canvas"></canvas>
+
+  <!-- Interactive 2D Whiteboard & Annotation Layer -->
+  <canvas id="annotation-canvas"></canvas>
+
+  <!-- =========================================================================
+       FLOATING EXIT 3D BUTTON (ALWAYS VISIBLE WHEN "EXPLORE IN 3D" IS ACTIVE)
+       ========================================================================= -->
+  <div id="immersive-exit-bar" class="hidden fixed top-5 left-1/2 -translate-x-1/2 z-50 pointer-events-auto">
+    <button onclick="window.exitImmersive3D()" class="flex items-center gap-2 px-5 py-2.5 rounded-2xl bg-sky-600 hover:bg-sky-500 text-white font-extrabold text-xs uppercase tracking-wider shadow-xl shadow-sky-600/30 transition transform hover:scale-105 border border-sky-400">
+      <i data-lucide="arrow-left" class="w-4 h-4"></i>
+      <span>Exit 3D Focus & Return (Esc)</span>
+    </button>
+  </div>
+
+  <!-- =========================================================================
+       TOP GLOBAL HEADER BAR (SINGLE UNIFIED STUDENT PROFILE)
+       ========================================================================= -->
+  <header class="absolute top-3 left-3 right-3 z-20 flex items-center justify-between gap-3 pointer-events-none">
+    <!-- Left App Logo -->
+    <button onclick="window.switchPage('exploration')" class="pointer-events-auto flex items-center gap-3 px-4 py-2 rounded-2xl glass-panel hover:border-sky-400 transition">
+      <div class="w-9 h-9 rounded-xl bg-gradient-to-tr from-sky-500 via-blue-600 to-indigo-600 flex items-center justify-center shadow-md shadow-sky-500/25">
+        <i data-lucide="box" class="w-5 h-5 text-white"></i>
+      </div>
+      <div class="text-left">
+        <div class="flex items-center gap-2">
+          <span class="text-sm font-extrabold tracking-wider text-slate-900">EDU-3D</span>
+          <span class="text-[10px] px-2 py-0.5 rounded-full bg-sky-100 text-sky-700 font-mono border border-sky-300">LAB v3.5</span>
+        </div>
+        <p class="text-[10px] text-slate-500">Interactive Spatial Learning</p>
+      </div>
+    </button>
+
+    <!-- Center Navigation Tabs: Userview / Learning / Design -->
+    <div class="pointer-events-auto hidden md:flex items-center p-1.5 rounded-2xl glass-panel gap-1 text-xs font-medium">
+      <button onclick="window.setTopMode('userview')" id="btn-top-userview" class="px-4 py-1.5 rounded-xl transition bg-sky-600 text-white shadow font-bold">Userview</button>
+      <button onclick="window.setTopMode('learning')" id="btn-top-learning" class="px-4 py-1.5 rounded-xl transition text-slate-600 hover:text-slate-900">Learning (Syllabus)</button>
+      <button onclick="window.setTopMode('design')" id="btn-top-design" class="px-4 py-1.5 rounded-xl transition text-slate-600 hover:text-slate-900">Design (Studio)</button>
+    </div>
+
+    <!-- Right Global Actions (Search, Badges, Notifications, SINGLE Profile Button) -->
+    <div class="pointer-events-auto flex items-center gap-2.5 relative">
+      <!-- Search Bar -->
+      <div class="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-xl glass-panel text-xs text-slate-700 border border-sky-200 focus-within:border-sky-500">
+        <i data-lucide="search" class="w-3.5 h-3.5 text-sky-600"></i>
+        <input id="quick-search" type="text" placeholder="Search math, history, cell..." oninput="window.handleQuickSearch(this.value)" class="bg-transparent text-xs text-slate-900 placeholder-slate-400 outline-none w-36 lg:w-44">
+      </div>
+
+      <!-- Badges Counter Button -->
+      <button onclick="window.openBadgesModal()" class="flex items-center gap-1.5 px-3 py-1.5 rounded-xl glass-panel text-xs text-amber-700 font-mono hover:bg-amber-50 transition border border-amber-200">
+        <i data-lucide="award" class="w-4 h-4 text-amber-500"></i>
+        <span class="font-bold">12 Badges</span>
+      </button>
+
+      <!-- Notification Bell Button -->
+      <button onclick="window.toggleNotificationsTray(event)" id="btn-notification-bell" class="relative w-9 h-9 rounded-xl glass-panel flex items-center justify-center text-slate-600 hover:text-slate-900 transition border border-sky-200 pointer-events-auto">
+        <i data-lucide="bell" class="w-4 h-4"></i>
+        <span id="notification-badge-dot" class="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-red-500 animate-pulse"></span>
+      </button>
+
+      <!-- Single Primary Student Profile Button (Opens Profile Modal) -->
+      <button onclick="window.openProfileModal()" id="header-profile-btn" class="flex items-center gap-2.5 p-1.5 pr-3.5 rounded-2xl glass-panel hover:border-sky-400 transition">
+        <div class="w-8 h-8 rounded-xl bg-gradient-to-tr from-sky-500 to-indigo-600 flex items-center justify-center text-white text-xs font-bold ring-2 ring-sky-300">
+          <span id="header-avatar-initial">G</span>
+        </div>
+        <div class="text-left hidden lg:block">
+          <p id="header-display-name" class="text-xs font-semibold text-slate-800 leading-tight">Grodset Student</p>
+          <span id="header-display-class" class="text-[10px] text-sky-600 font-mono">Class 11-A STEM</span>
+        </div>
+      </button>
+
+      <!-- Institutional SSO Login Trigger -->
+      <button onclick="window.openLoginModal()" class="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-sky-100 text-sky-700 border border-sky-300 hover:bg-sky-200 text-xs font-medium transition">
+        <i data-lucide="log-in" class="w-3.5 h-3.5"></i>
+        <span>SSO Login</span>
+      </button>
+
+      <!-- NOTIFICATIONS DROPDOWN TRAY -->
+      <div id="notifications-tray" class="hidden absolute top-14 right-2 sm:right-28 w-80 rounded-2xl glass-panel p-4 z-[60] border border-sky-300 shadow-2xl space-y-3 pointer-events-auto bg-white/95 backdrop-blur-2xl">
+        <div class="flex items-center justify-between border-b border-sky-100 pb-2">
+          <h4 class="text-xs font-bold text-slate-900 flex items-center gap-2">
+            <i data-lucide="bell-ring" class="w-3.5 h-3.5 text-sky-600"></i>
+            Recent Notifications
+          </h4>
+          <span id="notif-count-label" class="text-[10px] text-sky-600 font-mono font-bold">3 Unread</span>
+        </div>
+        <div class="space-y-2 text-xs">
+          <div class="p-2 rounded-xl bg-sky-50 border border-sky-200">
+            <p class="font-semibold text-sky-800 text-[11px]">Assignment Due Tomorrow</p>
+            <p class="text-[10px] text-slate-600 mt-0.5">Submit 3D Giza Pyramid archaeological alignment questions.</p>
+          </div>
+          <div class="p-2 rounded-xl bg-amber-50 border border-amber-200">
+            <p class="font-semibold text-amber-800 text-[11px]">Streak Maintained!</p>
+            <p class="text-[10px] text-slate-600 mt-0.5">5 days continuous learning! +50 bonus academy points awarded.</p>
+          </div>
+          <div class="p-2 rounded-xl bg-purple-50 border border-purple-200">
+            <p class="font-semibold text-purple-800 text-[11px]">New Quiz Released</p>
+            <p class="text-[10px] text-slate-600 mt-0.5">Differential Geometry & Torus topology quiz is now live.</p>
+          </div>
+        </div>
+        <button onclick="window.markNotificationsRead(event)" class="w-full py-1.5 rounded-xl bg-sky-100 hover:bg-sky-200 text-[11px] font-semibold text-sky-800 text-center transition border border-sky-300">
+          Mark All As Read
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- =========================================================================
+       LEFT NAVIGATION SIDEBAR (CLEAN LAB NAV, NO SECOND PROFILE)
+       ========================================================================= -->
+  <aside id="left-sidebar" class="absolute top-20 left-3 bottom-5 z-20 w-64 flex flex-col justify-between rounded-3xl glass-panel p-4 pointer-events-auto transition-transform duration-300 shadow-2xl">
+    <div class="space-y-4">
+      <!-- Subject Status Badge -->
+      <div class="p-3 rounded-2xl glass-card border border-sky-200 flex items-center justify-between">
+        <div class="flex items-center gap-2">
+          <span class="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
+          <span class="text-xs font-semibold text-slate-800">Active Lab Engine</span>
+        </div>
+        <span class="text-[10px] font-mono text-sky-700 bg-sky-100 px-2 py-0.5 rounded-full border border-sky-300">WebGL 3D</span>
+      </div>
+
+      <!-- Main Navigation Menu -->
+      <div class="space-y-1">
+        <span class="text-[10px] font-mono uppercase tracking-wider text-slate-400 px-3">Main Navigation</span>
+
+        <button onclick="window.switchPage('exploration')" id="nav-btn-exploration" class="w-full text-left flex items-center gap-2.5 px-3 py-2.5 rounded-2xl text-xs text-sky-900 bg-sky-100 border border-sky-300/80 font-bold transition shadow-sm">
+          <i data-lucide="compass" class="w-4 h-4 text-sky-600"></i>
+          <span>Exploration (3D Lab)</span>
+        </button>
+
+        <button onclick="window.switchPage('modules')" id="nav-btn-modules" class="w-full text-left flex items-center gap-2.5 px-3 py-2.5 rounded-2xl text-xs text-slate-600 hover:text-slate-900 hover:bg-sky-50 transition">
+          <i data-lucide="layers" class="w-4 h-4 text-sky-600"></i>
+          <span>3D Modules Catalog</span>
+        </button>
+
+        <button onclick="window.switchPage('progress')" id="nav-btn-progress" class="w-full text-left flex items-center gap-2.5 px-3 py-2.5 rounded-2xl text-xs text-slate-600 hover:text-slate-900 hover:bg-sky-50 transition">
+          <i data-lucide="bar-chart-2" class="w-4 h-4 text-emerald-600"></i>
+          <span>My Progress</span>
+          <span class="ml-auto text-[10px] font-mono text-emerald-700 bg-emerald-100 px-1.5 py-0.5 rounded border border-emerald-200">74%</span>
+        </button>
+
+        <button onclick="window.switchPage('quiz-arena')" id="nav-btn-quiz" class="w-full text-left flex items-center gap-2.5 px-3 py-2.5 rounded-2xl text-xs text-slate-600 hover:text-slate-900 hover:bg-sky-50 transition">
+          <i data-lucide="help-circle" class="w-4 h-4 text-amber-600"></i>
+          <span>Quiz Zone Arena</span>
+          <span class="ml-auto text-[10px] font-bold text-amber-700 bg-amber-100 px-1.5 py-0.5 rounded-full border border-amber-200">Active</span>
+        </button>
+
+        <button onclick="window.switchPage('settings')" id="nav-btn-settings" class="w-full text-left flex items-center gap-2.5 px-3 py-2.5 rounded-2xl text-xs text-slate-600 hover:text-slate-900 hover:bg-sky-50 transition">
+          <i data-lucide="settings" class="w-4 h-4 text-indigo-600"></i>
+          <span>Settings & Lab</span>
+        </button>
+
+        <!-- Quick Subject Switchers inside Exploration -->
+        <div class="pt-3 border-t border-sky-200 space-y-1">
+          <span class="text-[9px] font-mono uppercase tracking-wider text-slate-400 px-3">6 STEM Subjects</span>
+
+          <button onclick="window.loadSubject('math')" id="sub-math" class="w-full text-left flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs text-amber-900 bg-amber-100/80 font-semibold transition">
+            <span class="w-2 h-2 rounded-full bg-amber-500"></span>
+            <span class="truncate">Mathematics & Geometry</span>
+          </button>
+          <button onclick="window.loadSubject('history')" id="sub-history" class="w-full text-left flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs text-slate-600 hover:text-slate-900 transition">
+            <span class="w-2 h-2 rounded-full bg-orange-500"></span>
+            <span class="truncate">World History & Giza</span>
+          </button>
+          <button onclick="window.loadSubject('cell')" id="sub-cell" class="w-full text-left flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs text-slate-600 hover:text-slate-900 transition">
+            <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
+            <span class="truncate">Cell Biology Lab</span>
+          </button>
+          <button onclick="window.loadSubject('heart')" id="sub-heart" class="w-full text-left flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs text-slate-600 hover:text-slate-900 transition">
+            <span class="w-2 h-2 rounded-full bg-rose-500"></span>
+            <span class="truncate">Anatomy Heart Lab</span>
+          </button>
+          <button onclick="window.loadSubject('atom')" id="sub-atom" class="w-full text-left flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs text-slate-600 hover:text-slate-900 transition">
+            <span class="w-2 h-2 rounded-full bg-sky-500"></span>
+            <span class="truncate">Particle Chemistry</span>
+          </button>
+          <button onclick="window.loadSubject('engine')" id="sub-engine" class="w-full text-left flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs text-slate-600 hover:text-slate-900 transition">
+            <span class="w-2 h-2 rounded-full bg-purple-500"></span>
+            <span class="truncate">Mechanics Engine</span>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Weekly Streak Card -->
+    <div onclick="window.switchPage('progress')" class="cursor-pointer p-3.5 rounded-2xl bg-gradient-to-br from-amber-50 via-sky-50 to-orange-50 border border-amber-200 hover:border-amber-400 transition shadow-sm">
+      <div class="flex items-center justify-between mb-1">
+        <span class="text-[11px] font-semibold text-slate-700">Weekly Streak:</span>
+        <span class="text-xs font-bold text-amber-600">5 Days</span>
+      </div>
+      <div class="flex items-center gap-2">
+        <span class="text-xl">🔥</span>
+        <div class="w-full bg-slate-200 h-1.5 rounded-full overflow-hidden">
+          <div class="bg-gradient-to-r from-amber-400 to-orange-500 h-full w-5/7 rounded-full"></div>
+        </div>
+      </div>
+      <p class="text-[10px] text-slate-500 mt-2">Active daily study bonus +50 XP</p>
+    </div>
+  </aside>
+
+  <!-- =========================================================================
+       RIGHT LEARNING HUD & TELEMETRY PANEL
+       ========================================================================= -->
+  <aside id="right-hud" class="absolute top-20 right-3 bottom-5 z-20 w-80 lg:w-88 flex flex-col justify-between rounded-3xl glass-panel p-4 pointer-events-auto transition-transform duration-300 shadow-2xl overflow-y-auto">
+    <div class="space-y-3.5">
+      <!-- Title & Topic Header -->
+      <div class="border-b border-sky-100 pb-3">
+        <div class="flex items-center justify-between mb-1">
+          <span id="hud-topic-tag" class="text-[10px] font-mono text-sky-700 tracking-wider uppercase font-semibold">
+            Topic: 3D Topology & Geometry
+          </span>
+          <button onclick="window.toggleRightHud()" class="p-1 rounded-lg text-slate-400 hover:text-slate-800 transition">
+            <i data-lucide="x" class="w-4 h-4"></i>
+          </button>
+        </div>
+        <h2 id="hud-topic-title" class="text-lg font-bold text-slate-900 tracking-tight leading-snug">
+          Higher-Dimensional Surfaces
+        </h2>
+        <p id="hud-topic-desc" class="text-xs text-slate-600 mt-1 leading-relaxed">
+          Interactive mathematical exploration of non-Euclidean geometry, parametric Torus Knots T(p,q), Euler characteristic, and isometric lattices.
+        </p>
+      </div>
+
+      <!-- Action Button (Explore in 3D / Immersive Fullscreen Mode) -->
+      <button onclick="window.toggleImmersive3D()" id="btn-immersive-mode" class="w-full py-2.5 rounded-2xl bg-sky-600 hover:bg-sky-500 text-white font-bold text-xs uppercase tracking-wider transition shadow-md shadow-sky-600/25 flex items-center justify-center gap-2">
+        <i data-lucide="maximize" class="w-4 h-4"></i>
+        <span id="hud-explore-btn-text">Explore in 3D (Focus)</span>
+      </button>
+
+      <!-- Quick Action Buttons: Annotate, Physics Overlay, Read Aloud, Take Quiz -->
+      <div class="grid grid-cols-4 gap-1.5 text-center">
+        <button onclick="window.toggleAnnotationCanvas()" id="btn-quick-annotate" class="p-2 rounded-xl glass-card hover:bg-sky-100/80 transition border border-sky-200" title="Draw on 3D Canvas">
+          <i data-lucide="edit-3" class="w-3.5 h-3.5 text-sky-600 mx-auto mb-1"></i>
+          <span class="text-[9px] text-slate-700 font-semibold block">Annotate</span>
+        </button>
+        <button onclick="window.togglePhysicsOverlay()" id="btn-quick-overlay" class="p-2 rounded-xl glass-card hover:bg-sky-100/80 transition border border-sky-200" title="View Formulas & Vectors">
+          <i data-lucide="activity" class="w-3.5 h-3.5 text-emerald-600 mx-auto mb-1"></i>
+          <span class="text-[9px] text-slate-700 font-semibold block">Formulas</span>
+        </button>
+        <button onclick="window.narrateCurrentTopic()" id="btn-quick-audio" class="p-2 rounded-xl glass-card hover:bg-sky-100/80 transition border border-sky-200" title="Voice Narration">
+          <i data-lucide="volume-2" class="w-3.5 h-3.5 text-indigo-600 mx-auto mb-1"></i>
+          <span class="text-[9px] text-slate-700 font-semibold block">Read Aloud</span>
+        </button>
+        <button onclick="window.openQuizModal()" class="p-2 rounded-xl glass-card hover:bg-sky-100/80 transition border border-sky-200" title="Quiz Mode">
+          <i data-lucide="check-square" class="w-3.5 h-3.5 text-amber-600 mx-auto mb-1"></i>
+          <span class="text-[9px] text-slate-700 font-semibold block">Take Quiz</span>
+        </button>
+      </div>
+
+      <!-- Telemetry & Metrics -->
+      <div class="p-3 rounded-2xl glass-card space-y-2.5 border border-sky-200">
+        <div class="flex items-center justify-between text-xs font-semibold text-slate-900">
+          <span class="flex items-center gap-1.5">
+            <i data-lucide="gauge" class="w-3.5 h-3.5 text-sky-600"></i>
+            Telemetry & Dynamics
+          </span>
+          <span id="telemetry-object-name" class="text-[11px] font-mono text-sky-700 bg-sky-100 px-2 py-0.5 rounded border border-sky-300">Torus Knot T(3, 7)</span>
+        </div>
+
+        <div class="space-y-1.5 text-[11px] font-mono">
+          <div class="flex justify-between text-slate-500">
+            <span>Primary Parameter:</span>
+            <span id="tel-param1" class="text-slate-800 font-medium">x(t)=(R+r cos qt)cos pt</span>
+          </div>
+          <div class="flex justify-between text-slate-500">
+            <span>Characteristic:</span>
+            <span id="tel-param2" class="text-slate-800 font-medium">Euler χ = 0 (Genus 1)</span>
+          </div>
+          <div class="flex justify-between text-slate-500">
+            <span>Curvature / State:</span>
+            <span id="tel-param3" class="text-slate-800 font-medium">Variable Gaussian K</span>
+          </div>
+        </div>
+
+        <!-- Speed Multiplier Slider -->
+        <div class="pt-1">
+          <div class="flex justify-between text-[10px] font-mono text-slate-500 mb-1">
+            <span>Simulation Speed</span>
+            <span id="hud-speed-label" class="text-sky-700 font-bold">1.0x</span>
+          </div>
+          <input id="hud-speed-slider" type="range" min="0" max="4" step="0.1" value="1.0" oninput="window.changeSimulationSpeed(this.value)" class="w-full">
+        </div>
+      </div>
+
+      <!-- Visual Toggles -->
+      <div class="p-3 rounded-2xl glass-card space-y-2.5 border border-sky-200 text-xs">
+        <span class="text-[10px] font-mono uppercase text-slate-500 font-bold block mb-1">Visual Toggles</span>
+        
+        <div class="flex items-center justify-between">
+          <span class="text-slate-700 font-medium">Explode / Scale Model</span>
+          <button type="button" id="btn-toggle-explode" onclick="window.toggleYesNoButton('explode')" class="px-3 py-1 rounded-xl text-xs font-bold transition flex items-center gap-1.5 bg-slate-200 text-slate-600 border border-slate-300">
+            <span class="w-1.5 h-1.5 rounded-full bg-slate-400"></span>
+            <span class="label-text">OFF</span>
+          </button>
+        </div>
+
+        <div class="flex items-center justify-between">
+          <span class="text-slate-700 font-medium">Internal Casing / X-Ray</span>
+          <button type="button" id="btn-toggle-xray" onclick="window.toggleYesNoButton('xray')" class="px-3 py-1 rounded-xl text-xs font-bold transition flex items-center gap-1.5 bg-slate-200 text-slate-600 border border-slate-300">
+            <span class="w-1.5 h-1.5 rounded-full bg-slate-400"></span>
+            <span class="label-text">OFF</span>
+          </button>
+        </div>
+
+        <div class="flex items-center justify-between">
+          <span class="text-slate-700 font-medium">Particle Vector Trails</span>
+          <button type="button" id="btn-toggle-particles" onclick="window.toggleYesNoButton('particles')" class="px-3 py-1 rounded-xl text-xs font-bold transition flex items-center gap-1.5 bg-sky-600 text-white shadow-sm border border-sky-400">
+            <span class="w-1.5 h-1.5 rounded-full bg-white"></span>
+            <span class="label-text">ON</span>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Camera Angles Presets -->
+    <div class="pt-3 border-t border-sky-100">
+      <span class="text-[10px] font-mono uppercase text-slate-400 font-bold block mb-2">Camera Presets (Locked Zoom)</span>
+      <div class="grid grid-cols-2 gap-1.5 text-xs font-medium">
+        <button onclick="window.setCameraPreset('orbit')" class="py-1.5 px-2 rounded-xl bg-sky-100/80 hover:bg-sky-200 text-slate-700 hover:text-slate-900 transition text-center border border-sky-200">Perspective</button>
+        <button onclick="window.setCameraPreset('top')" class="py-1.5 px-2 rounded-xl bg-sky-100/80 hover:bg-sky-200 text-slate-700 hover:text-slate-900 transition text-center border border-sky-200">Top Down</button>
+        <button onclick="window.setCameraPreset('close')" class="py-1.5 px-2 rounded-xl bg-sky-100/80 hover:bg-sky-200 text-slate-700 hover:text-slate-900 transition text-center border border-sky-200">Front View</button>
+        <button onclick="window.setCameraPreset('reset')" class="py-1.5 px-2 rounded-xl bg-sky-100/80 hover:bg-sky-200 text-slate-700 hover:text-slate-900 transition text-center border border-sky-200">Reset Angle</button>
+      </div>
+    </div>
+  </aside>
+
+  <!-- =========================================================================
+       WHITEBOARD / ANNOTATION FLOATING TOOLBAR
+       ========================================================================= -->
+  <div id="annotation-toolbar" class="hidden absolute top-20 left-1/2 -translate-x-1/2 z-30 pointer-events-auto p-2 rounded-2xl glass-panel border border-sky-300 shadow-2xl flex items-center gap-2">
+    <div class="flex items-center gap-1.5 text-xs font-semibold text-slate-800 px-2">
+      <i data-lucide="edit-3" class="w-4 h-4 text-sky-600"></i>
+      <span>3D Pen Mode</span>
+    </div>
+    <div class="h-4 w-px bg-slate-300"></div>
+    <button onclick="window.setDrawColor('#0284c7')" class="w-6 h-6 rounded-full bg-sky-600 border-2 border-white shadow"></button>
+    <button onclick="window.setDrawColor('#d97706')" class="w-6 h-6 rounded-full bg-amber-500 border border-white/50"></button>
+    <button onclick="window.setDrawColor('#dc2626')" class="w-6 h-6 rounded-full bg-rose-600 border border-white/50"></button>
+    <button onclick="window.setDrawColor('#059669')" class="w-6 h-6 rounded-full bg-emerald-600 border border-white/50"></button>
+    <button onclick="window.clearDrawings()" class="px-2.5 py-1 rounded-xl bg-slate-200 hover:bg-slate-300 text-[11px] text-slate-700 font-semibold transition">Clear</button>
+    <button onclick="window.saveAnnotationSnapshot()" class="px-2.5 py-1 rounded-xl bg-sky-600 hover:bg-sky-500 text-[11px] text-white font-bold transition">Save Note</button>
+    <button onclick="window.toggleAnnotationCanvas()" class="p-1 text-slate-400 hover:text-slate-800"><i data-lucide="x" class="w-4 h-4"></i></button>
+  </div>
+
+  <!-- =========================================================================
+       DYNAMIC PHYSICS / MATHEMATICAL EQUATIONS OVERLAY
+       ========================================================================= -->
+  <div id="physics-overlay" class="hidden absolute bottom-20 right-88 z-20 pointer-events-auto w-96 rounded-3xl glass-panel p-5 border border-emerald-300 shadow-2xl space-y-3">
+    <div class="flex items-center justify-between border-b border-sky-100 pb-2">
+      <span class="text-xs font-bold text-emerald-700 flex items-center gap-2">
+        <i data-lucide="activity" class="w-4 h-4 text-emerald-600"></i>
+        Mathematical & Vector Formulas
+      </span>
+      <button onclick="window.togglePhysicsOverlay()" class="text-slate-400 hover:text-slate-800"><i data-lucide="x" class="w-3.5 h-3.5"></i></button>
+    </div>
+    <div id="physics-overlay-content" class="space-y-2 text-xs font-mono text-slate-700"></div>
+  </div>
+
+  <!-- =========================================================================
+       CENTER BOTTOM INSTRUCTION OVERLAY
+       ========================================================================= -->
+  <div id="center-instructions" class="absolute bottom-16 sm:bottom-16 left-1/2 -translate-x-1/2 z-20 pointer-events-none text-center transition-opacity duration-300">
+    <div class="px-5 py-1.5 rounded-2xl glass-panel text-[11px] text-slate-600 font-mono tracking-wide pointer-events-auto border border-sky-200 flex items-center gap-3 shadow-lg">
+      <div class="flex items-center gap-1.5 text-sky-700 font-semibold">
+        <i data-lucide="mouse-pointer" class="w-3.5 h-3.5"></i>
+        <span>Drag to rotate (Zoom locked)</span>
+      </div>
+      <span class="text-slate-300">|</span>
+      <div class="flex items-center gap-1.5 text-amber-600 font-semibold">
+        <i data-lucide="target" class="w-3.5 h-3.5"></i>
+        <span>Click 3D node to inspect</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- =========================================================================
+       SUBJECT BOTTOM SELECTOR DOCK (DIRECTLY CLICKABLE, HIGHLIGHTED)
+       ========================================================================= -->
+  <div id="bottom-subject-dock" class="absolute bottom-4 left-1/2 -translate-x-1/2 z-30 pointer-events-auto flex items-center justify-center w-full px-2 max-w-4xl transition-transform duration-300">
+    <div class="p-1.5 rounded-2xl glass-panel flex flex-wrap sm:flex-nowrap items-center justify-center gap-1.5 border border-sky-300 shadow-xl bg-white/95">
+      <button onclick="window.selectCategory('math')" id="dock-btn-math" class="px-3.5 py-1.5 rounded-xl text-xs font-bold transition shadow bg-sky-600 text-white flex items-center gap-1.5">
+        <span>📐</span>
+        <span>Mathematics</span>
+      </button>
+      <button onclick="window.selectCategory('history')" id="dock-btn-history" class="px-3.5 py-1.5 rounded-xl text-xs font-medium text-slate-600 hover:text-slate-900 hover:bg-sky-50 transition flex items-center gap-1.5">
+        <span>🏛️</span>
+        <span>World History</span>
+      </button>
+      <button onclick="window.selectCategory('cell')" id="dock-btn-cell" class="px-3.5 py-1.5 rounded-xl text-xs font-medium text-slate-600 hover:text-slate-900 hover:bg-sky-50 transition flex items-center gap-1.5">
+        <span>🔬</span>
+        <span>Cell Biology</span>
+      </button>
+      <button onclick="window.selectCategory('heart')" id="dock-btn-heart" class="px-3.5 py-1.5 rounded-xl text-xs font-medium text-slate-600 hover:text-slate-900 hover:bg-sky-50 transition flex items-center gap-1.5">
+        <span>❤️</span>
+        <span>Anatomy Heart</span>
+      </button>
+      <button onclick="window.selectCategory('atom')" id="dock-btn-atom" class="px-3.5 py-1.5 rounded-xl text-xs font-medium text-slate-600 hover:text-slate-900 hover:bg-sky-50 transition flex items-center gap-1.5">
+        <span>⚛️</span>
+        <span>Particle Chemistry</span>
+      </button>
+      <button onclick="window.selectCategory('engine')" id="dock-btn-engine" class="px-3.5 py-1.5 rounded-xl text-xs font-medium text-slate-600 hover:text-slate-900 hover:bg-sky-50 transition flex items-center gap-1.5">
+        <span>⚙️</span>
+        <span>Mechanics Engine</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- FLOATING TOOLTIP -->
+  <div id="model-tooltip" class="fixed pointer-events-none z-30 opacity-0 -translate-x-1/2 -translate-y-full transition-opacity duration-150 glass-card px-3 py-1.5 rounded-xl text-xs font-mono text-sky-800 border border-sky-300 flex items-center gap-2 shadow-xl bg-white/95">
+    <span class="w-2 h-2 rounded-full bg-sky-500 animate-ping"></span>
+    <span id="tooltip-title">Object</span>
+  </div>
+
+  <!-- =========================================================================
+       DEDICATED FULL-SCREEN PAGES / VIEWS
+       ========================================================================= -->
+
+  <!-- 1. 3D MODULES CATALOG PAGE -->
+  <div id="page-modules-catalog" class="hidden fixed inset-0 z-40 bg-[#f0f4f9]/95 backdrop-blur-xl p-6 lg:p-12 overflow-y-auto">
+    <div class="max-w-6xl mx-auto space-y-6">
+      <div class="flex items-center justify-between border-b border-sky-200 pb-4">
+        <div>
+          <h2 class="text-2xl font-extrabold text-slate-900">3D Module Catalog & Curriculum</h2>
+          <p class="text-xs text-slate-500 mt-1">Select an interactive 3D spatial laboratory to begin guided exploration.</p>
+        </div>
+        <button onclick="window.switchPage('exploration')" class="px-4 py-2 rounded-xl bg-sky-100 hover:bg-sky-200 text-xs font-bold text-sky-800 transition flex items-center gap-2 border border-sky-300">
+          <i data-lucide="arrow-left" class="w-4 h-4"></i> Back to 3D Lab
+        </button>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+        <div class="p-5 rounded-3xl glass-panel border border-amber-300 hover:border-amber-400 transition flex flex-col justify-between">
+          <div>
+            <div class="flex justify-between items-center mb-3">
+              <span class="text-[10px] font-mono text-amber-800 bg-amber-100 px-2.5 py-1 rounded-full border border-amber-300 font-bold">MATHEMATICS</span>
+              <span class="text-xs text-slate-500 font-medium">Unit 1</span>
+            </div>
+            <h3 class="text-base font-bold text-slate-900">Topology & Parametric Geometry</h3>
+            <p class="text-xs text-slate-600 mt-2">Investigate Torus Knots T(3,7), Gaussian curvature, Platonic solids, and 3D coordinate projection manifolds.</p>
+          </div>
+          <button onclick="window.launchSubjectFromCatalog('math')" class="mt-5 w-full py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs uppercase tracking-wider transition shadow-sm">
+            Launch 3D Geometry
+          </button>
+        </div>
+
+        <div class="p-5 rounded-3xl glass-panel border border-orange-300 hover:border-orange-400 transition flex flex-col justify-between">
+          <div>
+            <div class="flex justify-between items-center mb-3">
+              <span class="text-[10px] font-mono text-orange-800 bg-orange-100 px-2.5 py-1 rounded-full border border-orange-300 font-bold">WORLD HISTORY</span>
+              <span class="text-xs text-slate-500 font-medium">Unit 2</span>
+            </div>
+            <h3 class="text-base font-bold text-slate-900">The Great Pyramid & Khufu</h3>
+            <p class="text-xs text-slate-600 mt-2">Walk through the King's Chamber cutaway, explore the Grand Gallery, and witness celestial Sirius shaft alignments.</p>
+          </div>
+          <button onclick="window.launchSubjectFromCatalog('history')" class="mt-5 w-full py-2.5 rounded-xl bg-orange-500 hover:bg-orange-400 text-white font-bold text-xs uppercase tracking-wider transition shadow-sm">
+            Launch Giza Archaeology
+          </button>
+        </div>
+
+        <div class="p-5 rounded-3xl glass-panel border border-emerald-300 hover:border-emerald-400 transition flex flex-col justify-between">
+          <div>
+            <div class="flex justify-between items-center mb-3">
+              <span class="text-[10px] font-mono text-emerald-800 bg-emerald-100 px-2.5 py-1 rounded-full border border-emerald-300 font-bold">CELL BIOLOGY</span>
+              <span class="text-xs text-slate-500 font-medium">Unit 3</span>
+            </div>
+            <h3 class="text-base font-bold text-slate-900">Eukaryotic Organelle Synthesis</h3>
+            <p class="text-xs text-slate-600 mt-2">Interact with mitochondria, ribosomes, nuclear pores, and endoplasmic reticulum within a live semi-transparent cell.</p>
+          </div>
+          <button onclick="window.launchSubjectFromCatalog('cell')" class="mt-5 w-full py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs uppercase tracking-wider transition shadow-sm">
+            Launch Biology Lab
+          </button>
+        </div>
+
+        <div class="p-5 rounded-3xl glass-panel border border-rose-300 hover:border-rose-400 transition flex flex-col justify-between">
+          <div>
+            <div class="flex justify-between items-center mb-3">
+              <span class="text-[10px] font-mono text-rose-800 bg-rose-100 px-2.5 py-1 rounded-full border border-rose-300 font-bold">ANATOMY</span>
+              <span class="text-xs text-slate-500 font-medium">Unit 4</span>
+            </div>
+            <h3 class="text-base font-bold text-slate-900">Cardiovascular Hemodynamics</h3>
+            <p class="text-xs text-slate-600 mt-2">Study myocardium contraction cycles, mitral valve operation, aortic pressure waves, and systemic blood particles.</p>
+          </div>
+          <button onclick="window.launchSubjectFromCatalog('heart')" class="mt-5 w-full py-2.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs uppercase tracking-wider transition shadow-sm">
+            Launch Anatomy Lab
+          </button>
+        </div>
+
+        <div class="p-5 rounded-3xl glass-panel border border-sky-300 hover:border-sky-400 transition flex flex-col justify-between">
+          <div>
+            <div class="flex justify-between items-center mb-3">
+              <span class="text-[10px] font-mono text-sky-800 bg-sky-100 px-2.5 py-1 rounded-full border border-sky-300 font-bold">CHEMISTRY</span>
+              <span class="text-xs text-slate-500 font-medium">Unit 5</span>
+            </div>
+            <h3 class="text-base font-bold text-slate-900">Carbon-12 & Quantum Valence</h3>
+            <p class="text-xs text-slate-600 mt-2">Inspect 6 protons, 6 neutrons, and electron wave orbits in 1s, 2s, and 2p hybrid atomic orbitals.</p>
+          </div>
+          <button onclick="window.launchSubjectFromCatalog('atom')" class="mt-5 w-full py-2.5 rounded-xl bg-sky-600 hover:bg-sky-500 text-white font-bold text-xs uppercase tracking-wider transition shadow-sm">
+            Launch Particle Lab
+          </button>
+        </div>
+
+        <div class="p-5 rounded-3xl glass-panel border border-purple-300 hover:border-purple-400 transition flex flex-col justify-between">
+          <div>
+            <div class="flex justify-between items-center mb-3">
+              <span class="text-[10px] font-mono text-purple-800 bg-purple-100 px-2.5 py-1 rounded-full border border-purple-300 font-bold">MECHANICS</span>
+              <span class="text-xs text-slate-500 font-medium">Unit 6</span>
+            </div>
+            <h3 class="text-base font-bold text-slate-900">4-Stroke Engine Kinematics</h3>
+            <p class="text-xs text-slate-600 mt-2">Analyze intake, compression, power, exhaust strokes, reciprocating piston kinematics, and gear torque ratios.</p>
+          </div>
+          <button onclick="window.launchSubjectFromCatalog('engine')" class="mt-5 w-full py-2.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs uppercase tracking-wider transition shadow-sm">
+            Launch Mechanics Lab
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 2. MY PROGRESS ANALYTICS DASHBOARD PAGE -->
+  <div id="page-progress-dashboard" class="hidden fixed inset-0 z-40 bg-[#f0f4f9]/95 backdrop-blur-xl p-6 lg:p-12 overflow-y-auto">
+    <div class="max-w-5xl mx-auto space-y-6">
+      <div class="flex items-center justify-between border-b border-sky-200 pb-4">
+        <div>
+          <h2 class="text-2xl font-extrabold text-slate-900">Student Learning Analytics</h2>
+          <p class="text-xs text-slate-500 mt-1">Review your weekly study streak, module completion meters, and achievement certificates.</p>
+        </div>
+        <button onclick="window.switchPage('exploration')" class="px-4 py-2 rounded-xl bg-sky-100 hover:bg-sky-200 text-xs font-bold text-sky-800 transition flex items-center gap-2 border border-sky-300">
+          <i data-lucide="arrow-left" class="w-4 h-4"></i> Back to 3D Lab
+        </button>
+      </div>
+
+      <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div class="p-4 rounded-2xl glass-panel border border-emerald-300">
+          <span class="text-[11px] font-mono text-slate-500 font-medium">Overall Completion</span>
+          <p class="text-2xl font-bold text-emerald-600 mt-1">74.2%</p>
+          <span class="text-[10px] text-emerald-700 font-semibold">↑ +8% this week</span>
+        </div>
+        <div class="p-4 rounded-2xl glass-panel border border-amber-300">
+          <span class="text-[11px] font-mono text-slate-500 font-medium">Active Daily Streak</span>
+          <p class="text-2xl font-bold text-amber-600 mt-1">5 Days 🔥</p>
+          <span class="text-[10px] text-amber-700 font-semibold">Record: 14 Days</span>
+        </div>
+        <div class="p-4 rounded-2xl glass-panel border border-sky-300">
+          <span class="text-[11px] font-mono text-slate-500 font-medium">Study Time in 3D</span>
+          <p class="text-2xl font-bold text-sky-700 mt-1">18.5 Hrs</p>
+          <span class="text-[10px] text-sky-800 font-semibold">Avg 45m / session</span>
+        </div>
+        <div class="p-4 rounded-2xl glass-panel border border-purple-300">
+          <span class="text-[11px] font-mono text-slate-500 font-medium">Quiz Accuracy</span>
+          <p class="text-2xl font-bold text-purple-600 mt-1">91.6%</p>
+          <span class="text-[10px] text-purple-700 font-semibold">Top 5% in Class</span>
+        </div>
+      </div>
+
+      <div class="p-6 rounded-3xl glass-panel space-y-4 border border-sky-200">
+        <h3 class="text-sm font-bold text-slate-900">Subject Mastery Progress</h3>
+        <div class="space-y-3 text-xs">
+          <div>
+            <div class="flex justify-between text-slate-700 mb-1 font-medium">
+              <span>Mathematics: Differential Geometry</span>
+              <span class="text-amber-700 font-mono font-bold">90% Mastered</span>
+            </div>
+            <div class="w-full bg-slate-200 h-2 rounded-full overflow-hidden">
+              <div class="bg-amber-500 h-full w-[90%] rounded-full"></div>
+            </div>
+          </div>
+          <div>
+            <div class="flex justify-between text-slate-700 mb-1 font-medium">
+              <span>World History: Khufu Pyramid Architecture</span>
+              <span class="text-orange-700 font-mono font-bold">82% Mastered</span>
+            </div>
+            <div class="w-full bg-slate-200 h-2 rounded-full overflow-hidden">
+              <div class="bg-orange-500 h-full w-[82%] rounded-full"></div>
+            </div>
+          </div>
+          <div>
+            <div class="flex justify-between text-slate-700 mb-1 font-medium">
+              <span>Anatomy: Cardiovascular Cardiac Cycles</span>
+              <span class="text-rose-700 font-mono font-bold">75% Mastered</span>
+            </div>
+            <div class="w-full bg-slate-200 h-2 rounded-full overflow-hidden">
+              <div class="bg-rose-500 h-full w-[75%] rounded-full"></div>
+            </div>
+          </div>
+          <div>
+            <div class="flex justify-between text-slate-700 mb-1 font-medium">
+              <span>Chemistry: Carbon-12 Electron Valence</span>
+              <span class="text-sky-700 font-mono font-bold">68% Mastered</span>
+            </div>
+            <div class="w-full bg-slate-200 h-2 rounded-full overflow-hidden">
+              <div class="bg-sky-600 h-full w-[68%] rounded-full"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="p-5 rounded-3xl bg-gradient-to-r from-sky-100 via-blue-50 to-indigo-100 border border-sky-300 flex items-center justify-between shadow-sm">
+        <div>
+          <h4 class="text-sm font-bold text-slate-900">3D Spatial Geometry Master Certificate</h4>
+          <p class="text-xs text-slate-600 mt-1">Ready for export with verifiable institutional student signature.</p>
+        </div>
+        <button onclick="window.downloadCertificate()" class="px-4 py-2 rounded-xl bg-sky-600 hover:bg-sky-500 text-white font-bold text-xs uppercase tracking-wider transition shadow-md shadow-sky-600/20">
+          Download Certificate
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 3. FULL QUIZ ZONE ARENA PAGE -->
+  <div id="page-quiz-arena" class="hidden fixed inset-0 z-40 bg-[#f0f4f9]/95 backdrop-blur-xl p-6 lg:p-12 overflow-y-auto">
+    <div class="max-w-4xl mx-auto space-y-6">
+      <div class="flex items-center justify-between border-b border-sky-200 pb-4">
+        <div>
+          <h2 class="text-2xl font-extrabold text-slate-900">Quiz & Assessment Arena</h2>
+          <p class="text-xs text-slate-500 mt-1">Test your mastery across subjects with real-time feedback and certification tracking.</p>
+        </div>
+        <button onclick="window.switchPage('exploration')" class="px-4 py-2 rounded-xl bg-sky-100 hover:bg-sky-200 text-xs font-bold text-sky-800 transition flex items-center gap-2 border border-sky-300">
+          <i data-lucide="arrow-left" class="w-4 h-4"></i> Back to 3D Lab
+        </button>
+      </div>
+
+      <div class="grid grid-cols-2 sm:grid-cols-3 gap-3">
+        <button onclick="window.startArenaQuiz('math')" class="p-4 rounded-2xl glass-panel text-left hover:border-amber-400 transition">
+          <span class="text-amber-700 text-xs font-bold block mb-1">📐 Mathematics</span>
+          <span class="text-xs text-slate-600">Topology & Platonic Solids</span>
+        </button>
+        <button onclick="window.startArenaQuiz('history')" class="p-4 rounded-2xl glass-panel text-left hover:border-orange-400 transition">
+          <span class="text-orange-700 text-xs font-bold block mb-1">🏛️ World History</span>
+          <span class="text-xs text-slate-600">Pyramids & Giza Shafts</span>
+        </button>
+        <button onclick="window.startArenaQuiz('cell')" class="p-4 rounded-2xl glass-panel text-left hover:border-emerald-400 transition">
+          <span class="text-emerald-700 text-xs font-bold block mb-1">🔬 Cell Biology</span>
+          <span class="text-xs text-slate-600">Mitochondria & Organelles</span>
+        </button>
+        <button onclick="window.startArenaQuiz('heart')" class="p-4 rounded-2xl glass-panel text-left hover:border-rose-400 transition">
+          <span class="text-rose-700 text-xs font-bold block mb-1">❤️ Human Anatomy</span>
+          <span class="text-xs text-slate-600">Cardiac Ventricles & Aorta</span>
+        </button>
+        <button onclick="window.startArenaQuiz('atom')" class="p-4 rounded-2xl glass-panel text-left hover:border-sky-400 transition">
+          <span class="text-sky-700 text-xs font-bold block mb-1">⚛️ Chemistry</span>
+          <span class="text-xs text-slate-600">Quantum Carbon Orbitals</span>
+        </button>
+        <button onclick="window.startArenaQuiz('engine')" class="p-4 rounded-2xl glass-panel text-left hover:border-purple-400 transition">
+          <span class="text-purple-700 text-xs font-bold block mb-1">⚙️ Mechanics</span>
+          <span class="text-xs text-slate-600">4-Stroke Piston & Gears</span>
+        </button>
+      </div>
+
+      <div id="arena-question-card" class="p-6 rounded-3xl glass-panel border border-amber-300 space-y-4">
+        <div class="flex items-center justify-between text-xs font-mono text-slate-500 border-b border-sky-100 pb-3">
+          <span id="arena-subject-title" class="text-amber-700 font-bold">Mathematics Arena</span>
+          <span>Score: <span id="arena-score" class="text-emerald-600 font-bold">0</span></span>
+        </div>
+        <h3 id="arena-question-text" class="text-base font-semibold text-slate-900">Select a category above to start.</h3>
+        <div id="arena-options-container" class="space-y-2.5"></div>
+        <div id="arena-feedback" class="hidden p-3 rounded-xl text-xs font-mono"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 4. SETTINGS & LAB PREFERENCES PAGE -->
+  <div id="page-settings" class="hidden fixed inset-0 z-40 bg-[#f0f4f9]/95 backdrop-blur-xl p-6 lg:p-12 overflow-y-auto">
+    <div class="max-w-3xl mx-auto space-y-6">
+      <div class="flex items-center justify-between border-b border-sky-200 pb-4">
+        <div>
+          <h2 class="text-2xl font-extrabold text-slate-900">Settings & Lab Preferences</h2>
+          <p class="text-xs text-slate-500 mt-1">Configure rendering fidelity, narration controls, and input bindings.</p>
+        </div>
+        <button onclick="window.switchPage('exploration')" class="px-4 py-2 rounded-xl bg-sky-100 hover:bg-sky-200 text-xs font-bold text-sky-800 transition flex items-center gap-2 border border-sky-300">
+          <i data-lucide="arrow-left" class="w-4 h-4"></i> Back to 3D Lab
+        </button>
+      </div>
+
+      <div class="space-y-4">
+        <div class="p-5 rounded-3xl glass-panel space-y-3 border border-sky-200">
+          <h3 class="text-sm font-bold text-slate-900 flex items-center gap-2">
+            <i data-lucide="monitor" class="w-4 h-4 text-sky-600"></i> Rendering & Controls
+          </h3>
+          <div class="flex items-center justify-between text-xs">
+            <span class="text-slate-700 font-medium">Antialiasing & Shading</span>
+            <span class="px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-800 font-mono font-bold border border-emerald-300">Ultra Active</span>
+          </div>
+          <div class="flex items-center justify-between text-xs">
+            <span class="text-slate-700 font-medium">Locked Viewport Scale (Prevents Zoom Drifts)</span>
+            <span class="px-2.5 py-1 rounded-full bg-sky-100 text-sky-800 font-mono font-bold border border-sky-300">Active (Locked)</span>
+          </div>
+          <div class="flex items-center justify-between text-xs">
+            <span class="text-slate-700 font-medium">Auto-Rotation Drift Speed</span>
+            <input type="range" min="0" max="2" step="0.2" value="0.6" onchange="window.adjustAutoRotate(this.value)" class="w-36">
+          </div>
+        </div>
+
+        <div class="p-5 rounded-3xl glass-panel space-y-3 border border-sky-200">
+          <h3 class="text-sm font-bold text-slate-900 flex items-center gap-2">
+            <i data-lucide="volume-2" class="w-4 h-4 text-indigo-600"></i> Audio & Speech Synthesis
+          </h3>
+          <div class="flex items-center justify-between text-xs">
+            <span class="text-slate-700 font-medium">Narration Speech Rate</span>
+            <input type="range" min="0.5" max="1.5" step="0.1" value="1.0" id="setting-voice-rate" class="w-36">
+          </div>
+        </div>
+
+        <div class="p-5 rounded-3xl glass-panel space-y-3 border border-sky-200">
+          <h3 class="text-sm font-bold text-slate-900 flex items-center gap-2">
+            <i data-lucide="keyboard" class="w-4 h-4 text-amber-600"></i> Navigation Shortcuts
+          </h3>
+          <div class="grid grid-cols-2 gap-2 text-xs font-mono text-slate-700">
+            <div class="p-2 rounded-xl bg-sky-50 border border-sky-200 flex justify-between"><span>Rotate 3D:</span><kbd class="text-sky-700 font-bold">Mouse Drag</kbd></div>
+            <div class="p-2 rounded-xl bg-sky-50 border border-sky-200 flex justify-between"><span>Inspect Node:</span><kbd class="text-sky-700 font-bold">Left Click</kbd></div>
+            <div class="p-2 rounded-xl bg-sky-50 border border-sky-200 flex justify-between"><span>Reset Camera:</span><kbd class="text-sky-700 font-bold">Key 'R'</kbd></div>
+            <div class="p-2 rounded-xl bg-sky-50 border border-sky-200 flex justify-between"><span>Toggle Pen:</span><kbd class="text-sky-700 font-bold">Key 'A'</kbd></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 5. STUDENT PROFILE EDIT MODAL -->
+  <div id="modal-profile" class="hidden fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-md items-center justify-center p-4">
+    <div class="w-full max-w-md glass-panel rounded-3xl p-6 shadow-2xl border border-sky-300 bg-white/95">
+      <div class="flex items-center justify-between border-b border-sky-100 pb-3 mb-4">
+        <h3 class="text-base font-bold text-slate-900">Student Academic Profile</h3>
+        <button onclick="window.closeProfileModal()" class="text-slate-400 hover:text-slate-800"><i data-lucide="x" class="w-4 h-4"></i></button>
+      </div>
+
+      <form onsubmit="window.saveStudentProfile(event)" class="space-y-3 text-xs">
+        <div>
+          <label class="block text-slate-600 font-mono text-[11px] mb-1 font-medium">Full Student Name</label>
+          <input id="profile-input-name" type="text" value="Grodset Student" class="w-full bg-slate-50 border border-slate-300 focus:border-sky-500 rounded-xl px-3 py-2 text-slate-900 outline-none">
+        </div>
+        <div>
+          <label class="block text-slate-600 font-mono text-[11px] mb-1 font-medium">Class / Section</label>
+          <input id="profile-input-class" type="text" value="Class 11-A STEM" class="w-full bg-slate-50 border border-slate-300 focus:border-sky-500 rounded-xl px-3 py-2 text-slate-900 outline-none">
+        </div>
+        <div>
+          <label class="block text-slate-600 font-mono text-[11px] mb-1 font-medium">Institutional Student ID</label>
+          <input id="profile-input-id" type="text" value="EDU-2026-9812" class="w-full bg-slate-50 border border-slate-300 focus:border-sky-500 rounded-xl px-3 py-2 text-slate-900 outline-none">
+        </div>
+        <div>
+          <label class="block text-slate-600 font-mono text-[11px] mb-1 font-medium">Registered Academic Email</label>
+          <input id="profile-input-email" type="email" value="grodset.student@academy.edu" class="w-full bg-slate-50 border border-slate-300 focus:border-sky-500 rounded-xl px-3 py-2 text-slate-900 outline-none">
+        </div>
+
+        <button type="submit" class="w-full py-2.5 mt-2 rounded-xl bg-sky-600 hover:bg-sky-500 text-white font-bold text-xs uppercase tracking-wider transition shadow-md shadow-sky-600/20">
+          Save Profile Information
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <!-- 6. EARNED BADGES & TROPHY CASE MODAL -->
+  <div id="modal-badges" class="hidden fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-md items-center justify-center p-4">
+    <div class="w-full max-w-lg glass-panel rounded-3xl p-6 shadow-2xl border border-amber-300 bg-white/95">
+      <div class="flex items-center justify-between border-b border-sky-100 pb-3 mb-4">
+        <div class="flex items-center gap-2">
+          <i data-lucide="award" class="w-5 h-5 text-amber-500"></i>
+          <h3 class="text-base font-bold text-slate-900">Earned Badges & Trophy Case (12 Unlocked)</h3>
+        </div>
+        <button onclick="window.closeBadgesModal()" class="text-slate-400 hover:text-slate-800"><i data-lucide="x" class="w-4 h-4"></i></button>
+      </div>
+
+      <div class="grid grid-cols-2 gap-3 text-xs">
+        <div class="p-3 rounded-2xl bg-amber-50 border border-amber-200">
+          <span class="text-lg">📐</span>
+          <h4 class="font-bold text-amber-800 mt-1">Topology Master</h4>
+          <p class="text-[10px] text-slate-600 mt-0.5">Explored Torus Knot and proved Euler polyhedron theorem.</p>
+        </div>
+        <div class="p-3 rounded-2xl bg-orange-50 border border-orange-200">
+          <span class="text-lg">🏛️</span>
+          <h4 class="font-bold text-orange-800 mt-1">Giza Archaeologist</h4>
+          <p class="text-[10px] text-slate-600 mt-0.5">Discovered King's chamber internal shafts in full 3D.</p>
+        </div>
+        <div class="p-3 rounded-2xl bg-rose-50 border border-rose-200">
+          <span class="text-lg">❤️</span>
+          <h4 class="font-bold text-rose-800 mt-1">Master Anatomist</h4>
+          <p class="text-[10px] text-slate-600 mt-0.5">Traced systolic blood particle cycles through the aorta.</p>
+        </div>
+        <div class="p-3 rounded-2xl bg-sky-50 border border-sky-200">
+          <span class="text-lg">⚛️</span>
+          <h4 class="font-bold text-sky-800 mt-1">Quantum Explorer</h4>
+          <p class="text-[10px] text-slate-600 mt-0.5">Constructed valence shell orbitals for Carbon-12.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 8. DESIGN / LAB STUDIO MODE -->
+  <div id="page-lab-studio" class="hidden fixed inset-0 z-40 bg-[#f0f4f9]/95 backdrop-blur-xl p-6 lg:p-12 overflow-y-auto">
+    <div class="max-w-3xl mx-auto space-y-6">
+      <div class="flex items-center justify-between border-b border-sky-200 pb-4">
+        <div>
+          <h2 class="text-2xl font-extrabold text-slate-900">Lab Studio: 3D Model Customizer</h2>
+          <p class="text-xs text-slate-500 mt-1">Tweak material shading, inspect polygon counts, and take high-resolution screenshots.</p>
+        </div>
+        <button onclick="window.setTopMode('userview')" class="px-4 py-2 rounded-xl bg-sky-100 hover:bg-sky-200 text-xs font-bold text-sky-800 transition flex items-center gap-2 border border-sky-300">
+          <i data-lucide="arrow-left" class="w-4 h-4"></i> Back to 3D Lab
+        </button>
+      </div>
+
+      <div class="p-6 rounded-3xl glass-panel space-y-4 border border-sky-300">
+        <div class="flex items-center justify-between text-xs">
+          <span class="text-slate-700 font-medium">Ambient Lighting Tint</span>
+          <div class="flex gap-2">
+            <button onclick="window.setLightTint(0xffffff)" class="w-6 h-6 rounded-full bg-white border border-slate-300 shadow-sm"></button>
+            <button onclick="window.setLightTint(0x38bdf8)" class="w-6 h-6 rounded-full bg-sky-400 border border-slate-300 shadow-sm"></button>
+            <button onclick="window.setLightTint(0xf59e0b)" class="w-6 h-6 rounded-full bg-amber-400 border border-slate-300 shadow-sm"></button>
+            <button onclick="window.setLightTint(0xa855f7)" class="w-6 h-6 rounded-full bg-purple-400 border border-slate-300 shadow-sm"></button>
+          </div>
+        </div>
+
+        <div class="flex items-center justify-between text-xs">
+          <span class="text-slate-700 font-medium">Material Roughness</span>
+          <input type="range" min="0" max="1" step="0.1" value="0.3" oninput="window.adjustMeshRoughness(this.value)" class="w-36">
+        </div>
+
+        <div class="pt-4 border-t border-sky-100 flex justify-between items-center">
+          <span class="text-xs text-slate-500 font-medium">Export high-resolution screenshot of current 3D lab perspective.</span>
+          <button onclick="window.capture3DScreenshot()" class="px-4 py-2 rounded-xl bg-gradient-to-r from-sky-600 to-blue-700 hover:from-sky-500 hover:to-blue-600 text-white font-bold text-xs uppercase tracking-wider transition shadow-md shadow-sky-600/20">
+            Capture Screenshot
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- QUIZ ASSESSMENT MODAL (QUICK TEST) -->
+  <div id="quiz-modal" class="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-md hidden items-center justify-center p-4">
+    <div class="w-full max-w-lg glass-panel rounded-3xl p-6 shadow-2xl border border-amber-300 bg-white/95">
+      <div class="flex items-center justify-between border-b border-sky-100 pb-4 mb-4">
+        <div class="flex items-center gap-3">
+          <div class="w-9 h-9 rounded-xl bg-amber-100 text-amber-600 flex items-center justify-center border border-amber-300">
+            <i data-lucide="help-circle" class="w-5 h-5"></i>
+          </div>
+          <div>
+            <h3 class="text-base font-bold text-slate-900">Interactive Assessment</h3>
+            <span id="quiz-unit-label" class="text-xs text-amber-700 font-mono font-semibold">Module: Mathematics & Geometry</span>
+          </div>
+        </div>
+        <button onclick="window.closeQuizModal()" class="p-1 rounded-lg text-slate-400 hover:text-slate-800">
+          <i data-lucide="x" class="w-4 h-4"></i>
+        </button>
+      </div>
+
+      <div class="space-y-4">
+        <div class="flex justify-between items-center text-xs font-mono text-slate-500">
+          <span>Question <span id="quiz-q-curr">1</span> of 3</span>
+          <span>Score: <span id="quiz-score-num" class="text-emerald-600 font-bold">0</span>/3</span>
+        </div>
+
+        <h4 id="quiz-question-txt" class="text-sm font-semibold text-slate-900 leading-relaxed">
+          Question Text
+        </h4>
+
+        <div id="quiz-options-list" class="space-y-2 text-xs"></div>
+        <div id="quiz-feedback-box" class="hidden p-3 rounded-xl text-xs"></div>
+
+        <div class="pt-2 flex justify-end">
+          <button id="btn-next-question" onclick="window.advanceQuizQuestion()" class="hidden px-5 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs uppercase tracking-wider transition shadow-sm">
+            Next Question →
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- INSTITUTIONAL LOGIN MODAL -->
+  <div id="login-modal" class="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-lg hidden items-center justify-center p-4">
+    <div class="w-full max-w-md glass-panel rounded-3xl p-7 shadow-2xl border border-sky-300 bg-white/95 relative">
+      <button onclick="window.closeLoginModal()" class="absolute top-5 right-5 p-1 rounded-lg text-slate-400 hover:text-slate-800">
+        <i data-lucide="x" class="w-5 h-5"></i>
+      </button>
+
+      <div class="text-center mb-6">
+        <div class="w-12 h-12 rounded-2xl bg-gradient-to-tr from-sky-500 via-blue-600 to-indigo-600 flex items-center justify-center mx-auto mb-2.5 shadow-md shadow-sky-500/30">
+          <i data-lucide="sparkles" class="w-6 h-6 text-white"></i>
+        </div>
+        <h3 class="text-xl font-bold text-slate-900 tracking-wide">3D LEARNING LAB</h3>
+        <p class="text-xs text-slate-500 mt-0.5">School Login / Student Credentials</p>
+      </div>
+
+      <form onsubmit="window.handleLoginSubmit(event)" class="space-y-3.5 text-xs">
+        <div>
+          <label class="block text-slate-600 text-[11px] font-mono mb-1 font-medium">Username / Student Email</label>
+          <input id="login-email" type="text" value="student@academy.edu" required class="w-full bg-slate-50 border border-slate-300 focus:border-sky-500 rounded-xl px-3.5 py-2.5 text-slate-900 placeholder-slate-400 outline-none text-xs transition">
+        </div>
+
+        <div>
+          <label class="block text-slate-600 text-[11px] font-mono mb-1 font-medium">Password</label>
+          <div class="relative">
+            <input id="login-pwd" type="password" value="••••••••••••" required class="w-full bg-slate-50 border border-slate-300 focus:border-sky-500 rounded-xl px-3.5 py-2.5 text-slate-900 placeholder-slate-400 outline-none text-xs transition">
+            <button type="button" onclick="window.togglePasswordView()" class="absolute right-3 top-2.5 text-slate-400 hover:text-slate-800">
+              <i data-lucide="eye" class="w-4 h-4"></i>
+            </button>
+          </div>
+        </div>
+
+        <div class="flex items-center justify-between text-[11px] pt-1">
+          <label class="flex items-center gap-2 cursor-pointer text-slate-600">
+            <input type="checkbox" checked class="rounded bg-slate-100 border-slate-300 text-sky-600 focus:ring-0">
+            <span>Remember this device</span>
+          </label>
+          <a href="#" onclick="window.showQuickAlert('Password reset dispatched to guardian email.'); return false;" class="text-sky-700 hover:underline font-semibold">Forgotten Password?</a>
+        </div>
+
+        <button type="submit" class="w-full py-2.5 mt-2 rounded-xl bg-gradient-to-r from-sky-600 to-blue-700 hover:from-sky-500 hover:to-blue-600 text-white font-bold text-xs uppercase tracking-wider transition shadow-md shadow-sky-600/25">
+          Enter 3D Academy Lab
+        </button>
+      </form>
+
+      <div class="relative my-5">
+        <div class="absolute inset-0 flex items-center"><div class="w-full border-t border-sky-200"></div></div>
+        <div class="relative flex justify-center text-[10px] uppercase"><span class="bg-white px-2 text-slate-400 font-mono font-bold">Institutional Sign In</span></div>
+      </div>
+
+      <div class="space-y-2">
+        <button onclick="window.loginWithSSO('Google Workspace')" class="w-full py-2 rounded-xl bg-slate-50 border border-slate-200 text-slate-800 font-semibold text-xs flex items-center justify-center gap-2.5 hover:bg-slate-100 transition shadow-sm">
+          <svg class="w-4 h-4" viewBox="0 0 24 24">
+            <path fill="#4285F4" d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.8-2.4 3.68v3.05h3.88c2.27-2.09 3.665-5.17 3.665-9.17z"/>
+            <path fill="#34A853" d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.1-6.72-4.93H1.25v3.15C3.26 21.36 7.33 24 12 24z"/>
+            <path fill="#FBBC05" d="M5.28 14.27c-.25-.72-.38-1.49-.38-2.27s.13-1.55.38-2.27V6.58H1.25C.45 8.18 0 9.99 0 12s.45 3.82 1.25 5.42l4.03-3.15z"/>
+            <path fill="#EA4335" d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.33 0 3.26 2.64 1.25 6.58l4.03 3.15c.95-2.83 3.6-4.98 6.72-4.98z"/>
+          </svg>
+          <span>Google Workspace</span>
+        </button>
+
+        <button onclick="window.loginWithSSO('Microsoft Education')" class="w-full py-2 rounded-xl bg-slate-50 border border-slate-200 hover:bg-slate-100 text-slate-800 font-medium text-xs flex items-center justify-center gap-2.5 transition shadow-sm">
+          <svg class="w-4 h-4" viewBox="0 0 21 21">
+            <path fill="#f25022" d="M1 1h9v9H1z"/>
+            <path fill="#00a4ef" d="M1 11h9v9H1z"/>
+            <path fill="#7fba00" d="M11 1h9v9h-9z"/>
+            <path fill="#ffb900" d="M11 11h9v9h-9z"/>
+          </svg>
+          <span>Microsoft Education</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- TOAST NOTIFICATION -->
+  <div id="toast-msg" class="fixed top-5 left-1/2 -translate-x-1/2 z-50 pointer-events-none opacity-0 -translate-y-3 transition-all duration-300 glass-panel px-4 py-2.5 rounded-2xl text-xs font-mono text-sky-800 border border-sky-300 shadow-xl flex items-center gap-2 bg-white/95">
+    <i data-lucide="info" class="w-4 h-4 text-sky-600"></i>
+    <span id="toast-text">Notification</span>
+  </div>
+
+  <!-- =========================================================================
+       GLOBAL JAVASCRIPT CONTROLLER (100% EXPOSED WINDOW FUNCTIONS)
+       ========================================================================= -->
+  <script>
+    // Global State Container
+    window.labState = {
+      activeSubject: 'math',
+      simulationSpeed: 1.0,
+      isExploded: false,
+      isXRay: false,
+      showParticles: true,
+      showAnnotations: false,
+      isDrawing: false,
+      drawColor: '#38bdf8',
+      currentFocusObject: null,
+      quizIndex: 0,
+      quizScore: 0,
+      isImmersive: false
+    };
+
+    // 6 Full Subject Curriculums
+    window.topicsData = {
+      math: {
+        tag: 'Topic: 3D Topology & Differential Geometry',
+        title: 'Higher-Dimensional Surfaces & Platonic Solids',
+        desc: 'Interactive mathematical exploration of non-Euclidean geometry, parametric Torus Knots T(p,q), Euler characteristic (V - E + F = 2), and isometric coordinate lattices.',
+        exploreBtn: 'Inspect Parametric Geometry',
+        telObj: 'Torus Knot T(3, 7)',
+        p1: 'Parametric: x(t)=(R+r cos qt)cos pt',
+        p2: 'Euler Characteristic: χ = 0 (Genus 1)',
+        p3: 'Curvature: Variable Gaussian K',
+        camPos: [0, 8, 22],
+        targetPos: [0, 0, 0],
+        lecture: `
+          <h4 class="text-sm font-bold text-amber-600">Module 1: The Geometry of Torus Knots</h4>
+          <p>A torus knot is a special knot that lies on the surface of an unknotted torus in 3-dimensional Euclidean space. The parameter pair (p, q) specifies that the knot wraps around the torus longitude p times and through the torus hole q times.</p>
+          <div class="p-3 rounded-xl bg-white border border-sky-200 font-mono text-[11px] text-sky-800 shadow-sm">
+            x(t) = (R + r · cos(q·t)) · cos(p·t)<br>
+            y(t) = (R + r · cos(q·t)) · sin(p·t)<br>
+            z(t) = -r · sin(q·t)
+          </div>
+          <h4 class="text-sm font-bold text-amber-600 pt-2">Module 2: Euler's Polyhedral Formula</h4>
+          <p>For any simply connected convex polyhedron with Vertices (V), Edges (E), and Faces (F), the invariant topology holds: <strong>V - E + F = 2</strong>.</p>
+        `,
+        syllabusUnits: [
+          {
+            unit: "Unit 1.1",
+            title: "Parametric Manifolds & Torus Knots T(p, q)",
+            desc: "Continuous mapping of 1D closed curves embedded onto toroidal 2D surfaces in R³. Explores topological invariants, winding numbers, and self-intersection rules.",
+            formula: "x(t) = (R + r cos qt)cos pt, &nbsp; y(t) = (R + r cos qt)sin pt, &nbsp; z(t) = -r sin qt",
+            checkpoint: "Inspect the amber gold Torus Knot T(3, 7) to verify non-intersection over the periodic interval [0, 2π]."
+          },
+          {
+            unit: "Unit 1.2",
+            title: "Euler Polyhedral Formula & Platonic Dualities",
+            desc: "Proof of Euler's topological invariant χ = V - E + F = 2 on sphere-homeomorphic polyhedra and its transformation into χ = 2 - 2g = 0 for genus-1 torus manifolds.",
+            formula: "V - E + F = 2 &nbsp;|&nbsp; χ(Torus) = 2 - 2(1) = 0",
+            checkpoint: "Rotate the surrounding dual concentric Icosahedron and Dodecahedron wireframes to compare vertex-to-face dualities."
+          },
+          {
+            unit: "Unit 1.3",
+            title: "Differential Geometry & Gaussian Curvature",
+            desc: "Local surface curvature analysis comparing principal curvatures k₁ and k₂ across elliptic, parabolic, and hyperbolic regions of the torus.",
+            formula: "K = k₁ · k₂ = cos(θ) / [r · (R + r cos θ)]",
+            checkpoint: "Toggle X-Ray mode to observe the wireframe density across positive and negative curvature zones."
+          }
+        ],
+        formulas: `
+          <div><span class="text-amber-400">Euler Polyhedral Formula:</span> V - E + F = 2</div>
+          <div><span class="text-cyan-400">Gaussian Curvature:</span> K = k₁ · k₂</div>
+          <div><span class="text-emerald-400">Torus Knot Ratios:</span> p=3 (meridian loops), q=7 (longitudes)</div>
+        `,
+        quiz: [
+          {
+            q: "What is the Euler characteristic (V - E + F) for any convex polyhedron homeomorphic to a sphere?",
+            opts: ["0", "1", "2", "Infinity"],
+            ans: 2,
+            exp: "Euler's polyhedron formula states that Vertices - Edges + Faces = 2."
+          },
+          {
+            q: "How many regular convex Platonic solids exist in standard 3D Euclidean space?",
+            opts: ["4", "5", "6", "12"],
+            ans: 1,
+            exp: "There are exactly 5 Platonic solids: tetrahedron, cube, octahedron, dodecahedron, and icosahedron."
+          },
+          {
+            q: "A standard topological Torus has a genus (number of holes) of:",
+            opts: ["0", "1", "2", "Undefined"],
+            ans: 1,
+            exp: "A torus possesses exactly one central hole, giving it genus g = 1."
+          }
+        ]
+      },
+      history: {
+        tag: 'Topic: Ancient Architecture & Archeoastronomy',
+        title: 'The Great Pyramid of Khufu at Giza',
+        desc: 'Architectural engineering cutaway revealing the King Chamber, Grand Gallery, subterranean bedrock shaft, and precise cardinal orientation aligned to True North within 4 minutes of arc.',
+        exploreBtn: 'Inspect Burial Chambers',
+        telObj: 'King\'s Chamber & Sarcophagus',
+        p1: 'Original Height: 146.6 m (280 cubits)',
+        p2: 'Base Side: 230.33 m (~440 cubits)',
+        p3: 'Slope: 51°50\'40" (Golden Ratio φ)',
+        camPos: [0, 15, 32],
+        targetPos: [0, 0, 0],
+        lecture: `
+          <h4 class="text-sm font-bold text-orange-600">Module 1: Old Kingdom Civil Engineering</h4>
+          <p>Commissioned by Pharaoh Khufu circa 2570 BCE during Egypt's 4th Dynasty, the Great Pyramid was constructed with an estimated 2.3 million limestone blocks, weighing an average of 2.5 tons each.</p>
+          <div class="p-3 rounded-xl bg-white border border-sky-200 font-mono text-[11px] text-orange-800 shadow-sm">
+            Base Perimeter = 921.4 m<br>
+            Perimeter / (2 · Height) ≈ 3.14159 (π Approximator)<br>
+            Cardinal Deviation: < 4 minutes of arc to True North
+          </div>
+          <h4 class="text-sm font-bold text-orange-600 pt-2">Module 2: Celestial Archeoastronomy</h4>
+          <p>Narrow shafts radiating from the King's and Queen's Chambers pointed toward circumpolar stars, Sirius, and Orion's belt.</p>
+        `,
+        syllabusUnits: [
+          {
+            unit: "Unit 2.1",
+            title: "Fourth Dynasty Architecture & Mass Logistics",
+            desc: "Historical analysis of Pharaoh Khufu's pyramid complex (c. 2570 BCE). Study of quarrying over 2.3 million nummulitic limestone blocks and polished white Tura casing stones.",
+            formula: "Total Mass ≈ 5.9 × 10⁶ metric tons &nbsp;|&nbsp; Volume ≈ 2.58 × 10⁶ m³",
+            checkpoint: "Examine the stepped core blocks and the golden electrum pyramidion capstone crowning the monument."
+          },
+          {
+            unit: "Unit 2.2",
+            title: "Internal Corbelled Vaults & Relieving Chambers",
+            desc: "Engineering analysis of the 8.6-meter corbelled Grand Gallery ceiling and the massive 50-ton red Aswan granite lintels protecting the King's burial vault.",
+            formula: "Slope: θ = 51°50'40\" &nbsp;|&nbsp; Lintel Thickness: up to 1.8 m solid granite",
+            checkpoint: "Inspect the red granite King's Chamber cutaway located within the core of the 3D model."
+          },
+          {
+            unit: "Unit 2.3",
+            title: "Archeoastronomy & Cardinal Alignment",
+            desc: "The Great Pyramid's sides align to True North within 4 minutes of arc. Southern interior shafts align to Orion's Belt (Osiris) and Sirius (Isis).",
+            formula: "Cardinal Deviation < 0.067° &nbsp;|&nbsp; Southern Shaft Inclination ≈ 45°",
+            checkpoint: "Trace the celestial blue light shaft radiating outward from the royal burial chamber."
+          }
+        ],
+        formulas: `
+          <div><span class="text-orange-400">Slope Angle:</span> θ = 51°50'40" (tan θ ≈ 4/π)</div>
+          <div><span class="text-cyan-400">Limestone Mass:</span> Total mass ~ 6,000,000 metric tons</div>
+          <div><span class="text-amber-400">Airshaft Alignment:</span> 45° elevation toward Orion's Belt</div>
+        `,
+        quiz: [
+          {
+            q: "During which historical kingdom of Egypt was the Great Pyramid of Giza constructed?",
+            opts: ["New Kingdom", "Old Kingdom (4th Dynasty)", "Middle Kingdom", "Ptolemaic Period"],
+            ans: 1,
+            exp: "The Great Pyramid was commissioned by Pharaoh Khufu during the 4th Dynasty of the Old Kingdom."
+          },
+          {
+            q: "The Great Pyramid was originally encased in what reflective material?",
+            opts: ["Solid beaten gold", "Polished Tura white limestone", "Glazed lapis lazuli tiles", "Porphyry marble"],
+            ans: 1,
+            exp: "It was clad in gleaming polished Tura white limestone casing stones."
+          },
+          {
+            q: "The interior shafts leading outward from the King's Chamber are aligned toward which star cluster?",
+            opts: ["Sirius and Orion's Belt", "Mars", "Polaris exclusively", "Alpha Centauri"],
+            ans: 0,
+            exp: "The shafts align precisely with Orion and Sirius during the 3rd millennium BCE."
+          }
+        ]
+      },
+      cell: {
+        tag: 'Topic: Eukaryotic Cell Biology',
+        title: 'The Digital Biology Lab: Cell Organelles',
+        desc: 'High-fidelity cellular model highlighting mitochondrial oxidative phosphorylation, nuclear envelope pores, and endomembrane networks.',
+        exploreBtn: 'Inspect Organelles',
+        telObj: 'Mitochondrion (ATP Site)',
+        p1: '0.5 - 1.0 μm (Average Width)',
+        p2: '32-36 ATP / Glucose Molecule',
+        p3: 'Double Lipid Bilayer Membrane',
+        camPos: [0, 10, 20],
+        targetPos: [0, 0, 0],
+        lecture: `
+          <h4 class="text-sm font-bold text-emerald-600">Module 1: Cellular Aerobic Respiration</h4>
+          <p>Mitochondria convert pyruvate and oxygen into adenosine triphosphate (ATP) across the folded cristae of their inner membrane via the electron transport chain.</p>
+          <div class="p-3 rounded-xl bg-white border border-sky-200 font-mono text-[11px] text-emerald-800 shadow-sm">
+            C₆H₁₂O₆ + 6O₂ → 6CO₂ + 6H₂O + ~36 ATP
+          </div>
+        `,
+        syllabusUnits: [
+          {
+            unit: "Unit 3.1",
+            title: "Fluid Mosaic Lipid Bilayer & Membrane Transport",
+            desc: "Structure of the amphipathic phospholipid bilayer with hydrophobic hydrocarbon tails and hydrophilic phosphate heads regulating cellular osmotic homeostasis.",
+            formula: "Membrane Thickness: 7–10 nm &nbsp;|&nbsp; Resting Potential: ΔΨ ≈ -70 mV",
+            checkpoint: "Inspect the translucent green cellular plasma membrane enclosing the interior cytoplasm."
+          },
+          {
+            unit: "Unit 3.2",
+            title: "Mitochondrial Bioenergetics & ATP Synthase",
+            desc: "Study of oxidative phosphorylation across folded mitochondrial inner membrane cristae, generating a chemiosmotic proton gradient that drives ATP synthesis.",
+            formula: "C₆H₁₂O₆ + 6 O₂ + 36 ADP + 36 Pᵢ → 6 CO₂ + 6 H₂O + ~36 ATP",
+            checkpoint: "Click on any of the 6 floating yellow mitochondria to view their internal cristae rings."
+          },
+          {
+            unit: "Unit 3.3",
+            title: "Nuclear Envelope, Nucleolus & Endomembranes",
+            desc: "Selective transport through nuclear pore complexes, ribosomal RNA transcription in the dense nucleolus, and translation within the rough endoplasmic reticulum.",
+            formula: "Eukaryotic Ribosome: 80S (60S Large Subunit + 40S Small Subunit)",
+            checkpoint: "Explore the purple cutaway nucleus and the pulsing pink nucleolus core."
+          }
+        ],
+        formulas: `
+          <div><span class="text-emerald-400">Cell Respiration:</span> C₆H₁₂O₆ + 6O₂ → 6CO₂ + 6H₂O + 36 ATP</div>
+          <div><span class="text-cyan-400">Membrane Potential:</span> ΔΨm ≈ -150 to -180 mV</div>
+        `,
+        quiz: [
+          {
+            q: "Which specific organelle generates cellular ATP via oxidative phosphorylation?",
+            opts: ["Centriole", "Mitochondrion (Inner Cristae)", "Lysosome", "Golgi Apparatus"],
+            ans: 1,
+            exp: "Mitochondria produce cellular ATP through aerobic cellular respiration."
+          },
+          {
+            q: "What is the key role of nuclear pores within the nuclear envelope?",
+            opts: ["Pumping liquid water", "Selective macromolecular transport of RNA/proteins", "Synthesis of fatty acids", "Anchoring tissue"],
+            ans: 1,
+            exp: "Nuclear pores regulate bidirectional traffic of RNA transcripts and enzymes."
+          },
+          {
+            q: "In plant cells, which organelle captures solar photons to synthesize carbohydrates?",
+            opts: ["Chloroplast (Thylakoids)", "Endoplasmic Reticulum", "Peroxisome", "Vacuole"],
+            ans: 0,
+            exp: "Chloroplasts contain chlorophyll within thylakoids to perform photosynthesis."
+          }
+        ]
+      },
+      heart: {
+        tag: 'Topic: Cardiovascular Anatomy',
+        title: 'The Anatomy Lab: Human Heart',
+        desc: 'Dynamic myocardium cardiac cycle simulation depicting systemic blood circulation with interactive pulse BPM and vascular particle flows.',
+        exploreBtn: 'Inspect Atria & Ventricles',
+        telObj: 'Left Ventricle & Aorta',
+        p1: '72 BPM (Resting Pulse Rate)',
+        p2: '5.0 L/min (Cardiac Output)',
+        p3: '120/80 mmHg (Normal Arterial Pressure)',
+        camPos: [0, 8, 22],
+        targetPos: [0, 0, 0],
+        lecture: `
+          <h4 class="text-sm font-bold text-rose-600">Module 1: Cardiac Ventricular Hemodynamics</h4>
+          <p>The cardiac cycle alternates between systole (muscular contraction and ejection) and diastole (chamber relaxation and filling). The left ventricle delivers oxygenated blood to the whole body via high systemic pressure.</p>
+        `,
+        syllabusUnits: [
+          {
+            unit: "Unit 4.1",
+            title: "Myocardial Anatomy & Chamber Architecture",
+            desc: "Comparative structural dynamics of the left ventricle versus right ventricle, left/right receiving atria, and unidirectional atrioventricular valve dynamics.",
+            formula: "Wall Thickness: Left Ventricle (12–15 mm) vs Right Ventricle (3–5 mm) ≈ 3:1 ratio",
+            checkpoint: "Observe the thick muscular left ventricle pumping in synchrony with the rest of the heart."
+          },
+          {
+            unit: "Unit 4.2",
+            title: "Hemodynamics & Systemic Circulation",
+            desc: "Deoxygenated blood returns via the vena cava into the right atrium, travels to lungs for gas exchange, and returns oxygenated into the left atrium and aorta.",
+            formula: "Cardiac Output: Q = HR × SV ≈ 72 BPM × 70 mL ≈ 5.04 L/min",
+            checkpoint: "Trace the moving red (oxygen-rich) and blue (deoxygenated venous) particle streams."
+          },
+          {
+            unit: "Unit 4.3",
+            title: "Cardiac Cycle: Systole, Diastole & Pressure Waves",
+            desc: "Electrical impulse conduction from the sinoatrial node across the bundle of His, driving ventricular contraction waves and aortic pulse pressure.",
+            formula: "Mean Arterial Pressure: MAP = DBP + 1/3 (SBP - DBP) ≈ 80 + 1/3(40) = 93.3 mmHg",
+            checkpoint: "Use the simulation speed slider to slow down the 72 BPM cycle and observe rhythmic contraction phases."
+          }
+        ],
+        formulas: `
+          <div><span class="text-rose-400">Cardiac Output:</span> Q = HR (Heart Rate) × SV (Stroke Volume)</div>
+          <div><span class="text-cyan-400">Mean Arterial Pressure:</span> MAP ≈ DBP + 1/3 (SBP - DBP)</div>
+        `,
+        quiz: [
+          {
+            q: "Which heart chamber pumps oxygen-rich blood out to the entire body via the aorta?",
+            opts: ["Right Atrium", "Right Ventricle", "Left Atrium", "Left Ventricle"],
+            ans: 3,
+            exp: "The Left Ventricle has the thickest muscular wall to pump oxygenated blood into the aorta."
+          },
+          {
+            q: "What prevents backflow of blood when the left ventricle contracts?",
+            opts: ["Tricuspid Valve", "Mitral (Bicuspid) Valve", "Pulmonary Valve", "Eustachian Valve"],
+            ans: 1,
+            exp: "The mitral valve sits between left atrium and ventricle to prevent backflow."
+          },
+          {
+            q: "Where does deoxygenated blood first enter the heart after returning from bodily tissues?",
+            opts: ["Right Atrium via Vena Cava", "Left Ventricle", "Pulmonary Vein", "Coronary Sinus only"],
+            ans: 0,
+            exp: "Systemic venous blood drains into the Right Atrium through the vena cava."
+          }
+        ]
+      },
+      atom: {
+        tag: 'Topic: Quantum & Structural Chemistry',
+        title: 'The Particle Field: Carbon-12 Atom',
+        desc: 'Quantum valence electron shell model featuring 6 protons, 6 neutrons, and electron wave-particle orbits spanning 1s, 2s, and 2p hybrid orbitals.',
+        exploreBtn: 'Inspect Quantum Shells',
+        telObj: 'Carbon-12 Nucleus (6P + 6N)',
+        p1: '12.011 u (Standard Atomic Mass)',
+        p2: '1s² 2s² 2p² (Ground Electron Config)',
+        p3: '4 Valence Electrons (Tetravalent)',
+        camPos: [0, 7, 20],
+        targetPos: [0, 0, 0],
+        lecture: `
+          <h4 class="text-sm font-bold text-cyan-600">Module 1: Atomic Carbon & sp³ Hybridization</h4>
+          <p>Carbon with atomic number 6 possesses four valence electrons. Under hybrid orbital theory, one 2s and three 2p orbitals hybridize into four degenerate sp³ hybrid orbitals oriented at 109.5° angles.</p>
+        `,
+        syllabusUnits: [
+          {
+            unit: "Unit 5.1",
+            title: "The Atomic Nucleus & Strong Nuclear Confinement",
+            desc: "The Carbon-12 nucleus contains 6 protons and 6 neutrons tightly held by the residual strong force, overcoming electrostatic Coulomb repulsion between positive charges.",
+            formula: "Atomic Mass A = 12 &nbsp;|&nbsp; Nuclear Radius R ≈ 1.2 · A^(1/3) fm ≈ 2.75 fm",
+            checkpoint: "Inspect the 12-nucleon cluster at the center (6 red protons and 6 blue neutrons)."
+          },
+          {
+            unit: "Unit 5.2",
+            title: "Bohr Quantization & Electron Shells",
+            desc: "Quantized energy levels governed by the principal quantum number n. The inner K-shell (n=1) holds 2 electrons; the outer L-shell (n=2) holds 4 valence electrons.",
+            formula: "Electron Configuration: 1s² 2s² 2p² &nbsp;|&nbsp; Max Capacity = 2n²",
+            checkpoint: "Observe the inner cyan orbital ring and dual outer purple orbital rings with revolving electrons."
+          },
+          {
+            unit: "Unit 5.3",
+            title: "sp³ Orbital Hybridization & Molecular Geometry",
+            desc: "Linear combinations of 2s and three 2p atomic orbitals produce 4 equivalent sp³ hybrid orbitals directing toward the vertices of a regular tetrahedron.",
+            formula: "Bond Angle: θ = arccos(-1/3) ≈ 109.47° (Tetrahedral Valence)",
+            checkpoint: "View the spatial orientation of the 4 valence electrons revolving along orthogonal orbital planes."
+          }
+        ],
+        formulas: `
+          <div><span class="text-cyan-400">Electron Config:</span> 1s² 2s² 2p²</div>
+          <div><span class="text-amber-400">Valence Angle:</span> 109.5° (Tetrahedral sp³ Geometry)</div>
+        `,
+        quiz: [
+          {
+            q: "What is the atomic number of Carbon, defining its position on the Periodic Table?",
+            opts: ["4", "6", "12", "14"],
+            ans: 1,
+            exp: "The atomic number is determined by the 6 protons residing inside the nucleus."
+          },
+          {
+            q: "How many covalent bonds does a neutral Carbon atom typically form in organic molecules?",
+            opts: ["2", "3", "4", "6"],
+            ans: 2,
+            exp: "With 4 valence electrons, Carbon forms 4 covalent bonds to achieve a stable octet."
+          },
+          {
+            q: "Which quantum subshell is filled immediately after the 1s subshell?",
+            opts: ["2s", "2p", "3s", "1p"],
+            ans: 0,
+            exp: "According to the Aufbau principle, electrons occupy 1s followed by 2s."
+          }
+        ]
+      },
+      engine: {
+        tag: 'Topic: Kinematics & Mechanical Engineering',
+        title: '4-Stroke Internal Combustion & Gear Assembly',
+        desc: 'Interactive mechanical engine model showing synchronized 4-stroke cycle with reciprocating piston and gear train.',
+        exploreBtn: 'Inspect Piston & Crankshaft',
+        telObj: 'Reciprocating Piston Head',
+        p1: '4-Stroke Otto Cycle',
+        p2: '1:2 Cam-to-Crankshaft Ratio',
+        p3: '10.5:1 Compression Ratio',
+        camPos: [0, 8, 22],
+        targetPos: [0, 0, 0],
+        lecture: `
+          <h4 class="text-sm font-bold text-purple-600">Module 1: Otto Thermodynamic Cycle</h4>
+          <p>The 4-stroke cycle converts chemical energy of combustion into mechanical work through: 1) Intake stroke, 2) Compression stroke, 3) Power/Expansion stroke, 4) Exhaust stroke.</p>
+        `,
+        syllabusUnits: [
+          {
+            unit: "Unit 6.1",
+            title: "The 4-Stroke Otto Thermodynamic Cycle",
+            desc: "Analysis of the four discrete piston strokes: 1) Intake, 2) Isentropic Compression, 3) Constant-volume Combustion & Expansion, and 4) Exhaust blowdown.",
+            formula: "Thermal Efficiency: η = 1 - (1 / r^(γ - 1)) &nbsp;|&nbsp; Compression Ratio r ≈ 10.5:1",
+            checkpoint: "Watch the piston head reciprocate smoothly inside the transparent cylinder."
+          },
+          {
+            unit: "Unit 6.2",
+            title: "Slider-Crank Kinematics & Connecting Rod Dynamics",
+            desc: "Mathematical translation of linear reciprocating piston motion into continuous rotational torque about the crankshaft counterweight.",
+            formula: "Piston Displacement: y(θ) = R·cos(θ) + √(L² - R²·sin²(θ))",
+            checkpoint: "Observe the pivoting connecting rod angle relative to the spinning crankpin."
+          },
+          {
+            unit: "Unit 6.3",
+            title: "Involute Spur Gear Meshing & Torque Ratios",
+            desc: "Gear tooth kinematics ensuring uniform velocity ratio and torque multiplication between drive gears and camshaft timing gears.",
+            formula: "Gear Ratio: i = N₂ / N₁ = ω₁ / ω₂ = τ₂ / τ₁ &nbsp;|&nbsp; 12-Tooth Spur Meshing",
+            checkpoint: "Examine the counter-rotating interlocking gold and cyan gears at the base of the engine."
+          }
+        ],
+        formulas: `
+          <div><span class="text-purple-400">Mechanical Work:</span> W = ∮ P dV</div>
+          <div><span class="text-cyan-400">Gear Transmission Ratio:</span> i = N₂ / N₁ = 40 / 20 = 2.0</div>
+        `,
+        quiz: [
+          {
+            q: "During which stroke of a 4-stroke engine is the air-fuel mixture ignited by the spark plug?",
+            opts: ["Intake", "Compression", "Power (Combustion)", "Exhaust"],
+            ans: 2,
+            exp: "The spark plug fires near the end of the compression stroke, driving the Power stroke."
+          },
+          {
+            q: "What primary function does the crankshaft serve in an engine?",
+            opts: ["Transforms reciprocating linear stroke into rotational torque", "Filters oil", "Cools exhaust", "Increases octane"],
+            ans: 0,
+            exp: "The crankshaft transforms linear piston displacement into rotational torque."
+          },
+          {
+            q: "If a drive gear with 20 teeth turns a driven gear with 40 teeth, the gear ratio is:",
+            opts: ["1:2 (Speed doubles)", "2:1 (Torque doubles, speed halves)", "4:1", "1:1"],
+            ans: 1,
+            exp: "Driven teeth / Drive teeth = 40/20 = 2:1. Torque doubles, speed halves."
+          }
+        ]
+      }
+    };
+
+    // =========================================================================
+    // EXPOSED GLOBAL MODAL & PAGE CONTROLLER FUNCTIONS
+    // =========================================================================
+
+    window.hideAllPages = function() {
+      const pageIds = [
+        'page-modules-catalog',
+        'page-progress-dashboard',
+        'page-quiz-arena',
+        'page-settings',
+        'page-curriculum-reader',
+        'page-lab-studio'
+      ];
+      pageIds.forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.classList.add('hidden');
+      });
+    };
+
+    window.switchPage = function(pageKey) {
+      window.hideAllPages();
+
+      // Reset sidebar active indicators
+      ['exploration', 'modules', 'progress', 'quiz', 'settings'].forEach(k => {
+        const btn = document.getElementById(`nav-btn-${k}`);
+        if (btn) {
+          btn.className = "w-full text-left flex items-center gap-2.5 px-3 py-2.5 rounded-2xl text-xs text-slate-300 hover:text-white hover:bg-white/5 transition";
+        }
+      });
+
+      const activeBtnKey = pageKey === 'quiz-arena' ? 'quiz' : pageKey;
+      const targetBtn = document.getElementById(`nav-btn-${activeBtnKey}`);
+      if (targetBtn) {
+        targetBtn.className = "w-full text-left flex items-center gap-2.5 px-3 py-2.5 rounded-2xl text-xs text-amber-300 bg-white/10 font-bold transition";
+      }
+
+      if (pageKey === 'exploration') {
+        window.showQuickAlert('Returned to 3D Lab Canvas');
+      } else if (pageKey === 'modules') {
+        document.getElementById('page-modules-catalog').classList.remove('hidden');
+      } else if (pageKey === 'progress') {
+        document.getElementById('page-progress-dashboard').classList.remove('hidden');
+      } else if (pageKey === 'quiz-arena') {
+        document.getElementById('page-quiz-arena').classList.remove('hidden');
+        window.startArenaQuiz(window.labState.activeSubject);
+      } else if (pageKey === 'settings') {
+        document.getElementById('page-settings').classList.remove('hidden');
+      }
+    };
+
+    window.setTopMode = function(mode) {
+      ['userview', 'learning', 'design'].forEach(m => {
+        const btn = document.getElementById(`btn-top-${m}`);
+        if (btn) {
+          if (m === mode) {
+            btn.className = "px-4 py-1.5 rounded-xl transition bg-sky-500/15 text-sky-700 border border-sky-400/40 shadow-sm font-bold";
+          } else {
+            btn.className = "px-4 py-1.5 rounded-xl transition text-slate-500 hover:text-slate-800";
+          }
+        }
+      });
+
+      window.hideAllPages();
+
+      if (mode === 'userview') {
+        window.showQuickAlert('Userview: Interactive 3D Lab Perspective');
+      } else if (mode === 'learning') {
+        window.renderSyllabusTab(window.labState.activeSubject || 'all');
+        document.getElementById('page-curriculum-reader').classList.remove('hidden');
+      } else if (mode === 'design') {
+        document.getElementById('page-lab-studio').classList.remove('hidden');
+      }
+    };
+
+    window.renderSyllabusTab = function(subjectKey) {
+      const keys = ['all', 'math', 'history', 'cell', 'heart', 'atom', 'engine'];
+      keys.forEach(k => {
+        const tab = document.getElementById(`syl-tab-${k}`);
+        if (tab) {
+          if (k === subjectKey) {
+            tab.className = "px-3.5 py-1.5 rounded-xl text-xs font-bold transition whitespace-nowrap bg-sky-600 text-white shadow-sm flex items-center gap-1.5";
+          } else {
+            tab.className = "px-3.5 py-1.5 rounded-xl text-xs font-medium text-slate-600 hover:text-slate-900 hover:bg-sky-50 transition whitespace-nowrap flex items-center gap-1.5";
+          }
+        }
+      });
+
+      const container = document.getElementById('reader-body');
+      if (!container) return;
+
+      if (subjectKey === 'all') {
+        // Render all 6 modules
+        let html = '';
+        const allKeys = ['math', 'history', 'cell', 'heart', 'atom', 'engine'];
+        allKeys.forEach((key, idx) => {
+          const data = window.topicsData[key];
+          html += `
+            <div class="p-6 rounded-3xl glass-panel border border-sky-200/80 space-y-4 shadow-sm bg-white/95">
+              <div class="flex items-center justify-between border-b border-sky-100 pb-3">
+                <div class="flex items-center gap-2.5">
+                  <span class="w-7 h-7 rounded-lg bg-sky-100 text-sky-700 flex items-center justify-center font-bold text-xs">0${idx + 1}</span>
+                  <div>
+                    <h3 class="text-base font-bold text-slate-900">${data.title}</h3>
+                    <span class="text-[11px] font-mono text-sky-600 font-semibold uppercase tracking-wider">${data.tag}</span>
+                  </div>
+                </div>
+                <button onclick="window.launchSubjectFromCatalog('${key}')" class="px-3.5 py-1.5 rounded-xl bg-sky-600 hover:bg-sky-500 text-white font-bold text-xs uppercase tracking-wider transition shadow flex items-center gap-1.5">
+                  <i data-lucide="play" class="w-3.5 h-3.5"></i> Launch 3D Lab
+                </button>
+              </div>
+              <p class="text-xs text-slate-600 leading-relaxed">${data.desc}</p>
+              
+              <div class="grid grid-cols-1 md:grid-cols-3 gap-3 pt-2">
+                ${data.syllabusUnits.map(unit => `
+                  <div class="p-4 rounded-2xl bg-sky-50/70 border border-sky-100 space-y-2 flex flex-col justify-between">
+                    <div>
+                      <div class="flex items-center justify-between mb-1.5">
+                        <span class="text-[10px] font-mono font-bold text-sky-700 bg-sky-200/60 px-2 py-0.5 rounded-md">${unit.unit}</span>
+                      </div>
+                      <h4 class="text-xs font-bold text-slate-800 leading-snug">${unit.title}</h4>
+                      <p class="text-[11px] text-slate-500 mt-1 leading-relaxed">${unit.desc}</p>
+                    </div>
+                    <div class="mt-2 pt-2 border-t border-sky-200/60 font-mono text-[10px] text-sky-800 bg-white/70 p-2 rounded-lg">
+                      <strong>Checkpoint:</strong> ${unit.checkpoint}
+                    </div>
+                  </div>
+                `).join('')}
+              </div>
+            </div>
+          `;
+        });
+        container.innerHTML = html;
+      } else {
+        // Render single selected module
+        const data = window.topicsData[subjectKey];
+        if (!data) return;
+        let html = `
+          <div class="p-6 rounded-3xl glass-panel border border-sky-200/80 space-y-4 shadow-sm bg-white/95">
+            <div class="flex items-center justify-between border-b border-sky-100 pb-3">
+              <div>
+                <span class="text-[11px] font-mono text-sky-600 font-bold uppercase tracking-wider">${data.tag}</span>
+                <h3 class="text-xl font-bold text-slate-900 mt-0.5">${data.title}</h3>
+              </div>
+              <button onclick="window.launchSubjectFromCatalog('${subjectKey}')" class="px-4 py-2 rounded-xl bg-sky-600 hover:bg-sky-500 text-white font-bold text-xs uppercase tracking-wider transition shadow flex items-center gap-2">
+                <i data-lucide="play" class="w-4 h-4"></i> Launch in 3D
+              </button>
+            </div>
+            <p class="text-xs text-slate-600 leading-relaxed">${data.desc}</p>
+          </div>
+
+          <div class="space-y-4 pt-2">
+            ${data.syllabusUnits.map(unit => `
+              <div class="p-5 rounded-3xl glass-panel border border-sky-200/70 space-y-3 bg-white/90 shadow-sm hover:border-sky-300 transition">
+                <div class="flex items-center justify-between">
+                  <span class="text-xs font-mono font-bold text-sky-700 bg-sky-100 px-2.5 py-1 rounded-lg border border-sky-200">${unit.unit}</span>
+                  <span class="text-[10px] text-emerald-600 font-mono font-semibold flex items-center gap-1">
+                    <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span> 3D Interactive Lab Ready
+                  </span>
+                </div>
+                <h4 class="text-sm font-bold text-slate-900">${unit.title}</h4>
+                <p class="text-xs text-slate-600 leading-relaxed">${unit.desc}</p>
+                <div class="p-3.5 rounded-2xl bg-sky-50/80 border border-sky-100 font-mono text-[11px] text-sky-900 space-y-1">
+                  <span class="text-slate-400 block text-[9px] uppercase tracking-wider font-semibold">Scientific Formula / Invariant</span>
+                  <div>${unit.formula}</div>
+                </div>
+                <div class="p-3 rounded-2xl bg-amber-50/80 border border-amber-200/60 flex items-start gap-2.5 text-xs text-amber-900">
+                  <i data-lucide="crosshair" class="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5"></i>
+                  <div>
+                    <strong class="font-semibold text-amber-900">3D Lab Checkpoint:</strong>
+                    <span class="text-amber-800 ml-1">${unit.checkpoint}</span>
+                  </div>
+                </div>
+              </div>
+            `).join('')}
+          </div>
+        `;
+        container.innerHTML = html;
+      }
+
+      if (window.lucide && typeof window.lucide.createIcons === 'function') {
+        window.lucide.createIcons();
+      }
+    };
+
+    window.launchSubjectFromCatalog = function(subjectKey) {
+      window.switchPage('exploration');
+      window.loadSubject(subjectKey);
+    };
+
+    window.toggleNotificationsTray = function(e) {
+      if (e) e.stopPropagation();
+      const tray = document.getElementById('notifications-tray');
+      if (!tray) return;
+      const isHidden = tray.classList.contains('hidden');
+      if (isHidden) {
+        tray.classList.remove('hidden');
+      } else {
+        tray.classList.add('hidden');
+      }
+    };
+
+    window.markNotificationsRead = function(e) {
+      if (e) e.stopPropagation();
+      const tray = document.getElementById('notifications-tray');
+      if (tray) tray.classList.add('hidden');
+      const badge = document.getElementById('notification-badge-dot');
+      if (badge) badge.classList.add('hidden');
+      const countLabel = document.getElementById('notif-count-label');
+      if (countLabel) countLabel.innerText = '0 Unread';
+      window.showQuickAlert('All notifications marked as read.');
+    };
+
+    // Close notifications tray when clicking anywhere else
+    document.addEventListener('click', (e) => {
+      const tray = document.getElementById('notifications-tray');
+      const bell = document.getElementById('btn-notification-bell');
+      if (tray && !tray.classList.contains('hidden')) {
+        if (!tray.contains(e.target) && (!bell || !bell.contains(e.target))) {
+          tray.classList.add('hidden');
+        }
+      }
+    });
+
+    window.openBadgesModal = function() {
+      const m = document.getElementById('modal-badges');
+      if (m) { m.classList.remove('hidden'); m.classList.add('flex'); }
+    };
+
+    window.closeBadgesModal = function() {
+      const m = document.getElementById('modal-badges');
+      if (m) { m.classList.add('hidden'); m.classList.remove('flex'); }
+    };
+
+    window.openProfileModal = function() {
+      const m = document.getElementById('modal-profile');
+      if (m) { m.classList.remove('hidden'); m.classList.add('flex'); }
+    };
+
+    window.closeProfileModal = function() {
+      const m = document.getElementById('modal-profile');
+      if (m) { m.classList.add('hidden'); m.classList.remove('flex'); }
+    };
+
+    window.saveStudentProfile = function(e) {
+      if (e) e.preventDefault();
+      const name = document.getElementById('profile-input-name').value;
+      const cls = document.getElementById('profile-input-class').value;
+      document.getElementById('header-display-name').innerText = name;
+      document.getElementById('header-display-class').innerText = cls;
+      document.getElementById('header-avatar-initial').innerText = name.charAt(0).toUpperCase();
+      window.closeProfileModal();
+      window.showQuickAlert('Student profile updated successfully!');
+    };
+
+    window.openLoginModal = function() {
+      const m = document.getElementById('login-modal');
+      if (m) { m.classList.remove('hidden'); m.classList.add('flex'); }
+    };
+
+    window.closeLoginModal = function() {
+      const m = document.getElementById('login-modal');
+      if (m) { m.classList.add('hidden'); m.classList.remove('flex'); }
+    };
+
+    window.handleLoginSubmit = function(e) {
+      if (e) e.preventDefault();
+      const email = document.getElementById('login-email').value;
+      const cleanName = email.split('@')[0].replace('.', ' ');
+      const titleName = cleanName.charAt(0).toUpperCase() + cleanName.slice(1);
+      document.getElementById('header-display-name').innerText = titleName;
+      document.getElementById('header-avatar-initial').innerText = titleName.charAt(0);
+      window.closeLoginModal();
+      window.showQuickAlert(`Welcome back, ${titleName}! Session authenticated.`);
+    };
+
+    window.togglePasswordView = function() {
+      const pwd = document.getElementById('login-pwd');
+      if (pwd) {
+        pwd.type = pwd.type === 'password' ? 'text' : 'password';
+      }
+    };
+
+    window.loginWithSSO = function(provider) {
+      window.closeLoginModal();
+      document.getElementById('header-display-name').innerText = `${provider} Student`;
+      window.showQuickAlert(`Authenticated via institutional ${provider}!`);
+    };
+
+    window.toggleRightHud = function() {
+      const hud = document.getElementById('right-hud');
+      if (hud) hud.classList.toggle('translate-x-full');
+    };
+
+    window.toggleImmersive3D = function() {
+      window.labState.isImmersive = true;
+      const left = document.getElementById('left-sidebar');
+      const right = document.getElementById('right-hud');
+      const centerInst = document.getElementById('center-instructions');
+      const exitBar = document.getElementById('immersive-exit-bar');
+      const dock = document.getElementById('bottom-subject-dock');
+
+      if (left) left.classList.add('-translate-x-full');
+      if (right) right.classList.add('translate-x-full');
+      if (centerInst) centerInst.classList.add('opacity-0');
+      if (exitBar) exitBar.classList.remove('hidden');
+      if (dock) dock.classList.add('translate-y-20');
+
+      window.showQuickAlert('Immersive 3D Focus active. Click "Exit" or press ESC to return.');
+    };
+
+    window.exitImmersive3D = function() {
+      window.labState.isImmersive = false;
+      const left = document.getElementById('left-sidebar');
+      const right = document.getElementById('right-hud');
+      const centerInst = document.getElementById('center-instructions');
+      const exitBar = document.getElementById('immersive-exit-bar');
+      const dock = document.getElementById('bottom-subject-dock');
+
+      if (left) left.classList.remove('-translate-x-full');
+      if (right) right.classList.remove('translate-x-full');
+      if (centerInst) centerInst.classList.remove('opacity-0');
+      if (exitBar) exitBar.classList.add('hidden');
+      if (dock) dock.classList.remove('translate-y-20');
+
+      window.showQuickAlert('Returned to standard laboratory layout.');
+    };
+
+    // ESC Key Listener to exit 3D immersive view
+    window.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && window.labState.isImmersive) {
+        window.exitImmersive3D();
+      }
+    });
+
+    window.selectCategory = function(catKey) {
+      window.loadSubject(catKey);
+    };
+
+    window.togglePhysicsOverlay = function() {
+      const overlay = document.getElementById('physics-overlay');
+      if (!overlay) return;
+      const isHidden = overlay.classList.contains('hidden');
+      if (isHidden) {
+        const data = window.topicsData[window.labState.activeSubject];
+        document.getElementById('physics-overlay-content').innerHTML = data.formulas || '<p>Formulas active.</p>';
+        overlay.classList.remove('hidden');
+        window.showQuickAlert('Formulas & vectors overlay enabled.');
+      } else {
+        overlay.classList.add('hidden');
+      }
+    };
+
+    window.downloadCertificate = function() {
+      if (typeof confetti === 'function') confetti({ particleCount: 70, spread: 80, origin: { y: 0.6 } });
+      window.showQuickAlert('Certificate generated and downloaded successfully!');
+    };
+
+    window.narrateCurrentTopic = function() {
+      if ('speechSynthesis' in window) {
+        window.speechSynthesis.cancel();
+        const data = window.topicsData[window.labState.activeSubject];
+        const utterance = new SpeechSynthesisUtterance(`${data.title}. ${data.desc}`);
+        const rateInput = document.getElementById('setting-voice-rate');
+        utterance.rate = rateInput ? parseFloat(rateInput.value) : 1.0;
+        window.speechSynthesis.speak(utterance);
+        window.showQuickAlert(`Narrating: ${data.title}`);
+      } else {
+        window.showQuickAlert('Speech synthesis not supported in this browser.');
+      }
+    };
+
+    window.showQuickAlert = function(msg) {
+      const toast = document.getElementById('toast-msg');
+      const txt = document.getElementById('toast-text');
+      if (toast && txt) {
+        txt.innerText = msg;
+        toast.classList.remove('opacity-0', '-translate-y-3');
+        toast.classList.add('opacity-100', 'translate-y-0');
+        clearTimeout(window._toastTimeout);
+        window._toastTimeout = setTimeout(() => {
+          toast.classList.remove('opacity-100', 'translate-y-0');
+          toast.classList.add('opacity-0', '-translate-y-3');
+        }, 2500);
+      }
+    };
+
+    // =========================================================================
+    // 2D ANNOTATION WHITEBOARD CONTROLLER
+    // =========================================================================
+
+    let annotCanvas, annotCtx;
+
+    window.initAnnotationCanvas = function() {
+      annotCanvas = document.getElementById('annotation-canvas');
+      if (!annotCanvas) return;
+      annotCtx = annotCanvas.getContext('2d');
+      annotCanvas.width = window.innerWidth;
+      annotCanvas.height = window.innerHeight;
+
+      annotCanvas.addEventListener('mousedown', (e) => {
+        window.labState.isDrawing = true;
+        annotCtx.beginPath();
+        annotCtx.moveTo(e.clientX, e.clientY);
+      });
+      annotCanvas.addEventListener('mouseup', () => {
+        window.labState.isDrawing = false;
+        annotCtx.beginPath();
+      });
+      annotCanvas.addEventListener('mousemove', (e) => {
+        if (!window.labState.isDrawing) return;
+        annotCtx.lineWidth = 3;
+        annotCtx.lineCap = 'round';
+        annotCtx.strokeStyle = window.labState.drawColor;
+        annotCtx.lineTo(e.clientX, e.clientY);
+        annotCtx.stroke();
+      });
+
+      annotCanvas.addEventListener('touchstart', (e) => {
+        const touch = e.touches[0];
+        window.labState.isDrawing = true;
+        annotCtx.beginPath();
+        annotCtx.moveTo(touch.clientX, touch.clientY);
+      });
+      annotCanvas.addEventListener('touchend', () => {
+        window.labState.isDrawing = false;
+        annotCtx.beginPath();
+      });
+      annotCanvas.addEventListener('touchmove', (e) => {
+        if (!window.labState.isDrawing) return;
+        const touch = e.touches[0];
+        annotCtx.lineWidth = 3;
+        annotCtx.lineCap = 'round';
+        annotCtx.strokeStyle = window.labState.drawColor;
+        annotCtx.lineTo(touch.clientX, touch.clientY);
+        annotCtx.stroke();
+      });
+    };
+
+    window.toggleAnnotationCanvas = function() {
+      window.labState.showAnnotations = !window.labState.showAnnotations;
+      const canvasEl = document.getElementById('annotation-canvas');
+      const toolbar = document.getElementById('annotation-toolbar');
+
+      if (window.labState.showAnnotations) {
+        canvasEl.style.display = 'block';
+        toolbar.classList.remove('hidden');
+        if (window.controls) window.controls.enabled = false;
+        window.showQuickAlert('3D Pen Mode activated. Draw anywhere.');
+      } else {
+        canvasEl.style.display = 'none';
+        toolbar.classList.add('hidden');
+        if (window.controls) window.controls.enabled = true;
+        window.showQuickAlert('3D Pen deactivated.');
+      }
+    };
+
+    window.setDrawColor = function(color) {
+      window.labState.drawColor = color;
+      window.showQuickAlert('Pen color updated.');
+    };
+
+    window.clearDrawings = function() {
+      if (annotCtx && annotCanvas) {
+        annotCtx.clearRect(0, 0, annotCanvas.width, annotCanvas.height);
+        window.showQuickAlert('Canvas whiteboard cleared.');
+      }
+    };
+
+    window.saveAnnotationSnapshot = function() {
+      window.showQuickAlert('Note saved to student notebook!');
+      window.toggleAnnotationCanvas();
+    };
+
+    // =========================================================================
+    // QUICK QUIZ & ARENA QUIZ CONTROLLERS
+    // =========================================================================
+
+    window.openQuizModal = function() {
+      window.labState.quizIndex = 0;
+      window.labState.quizScore = 0;
+      const m = document.getElementById('quiz-modal');
+      if (m) { m.classList.remove('hidden'); m.classList.add('flex'); }
+      window.renderQuizQuestion();
+    };
+
+    window.closeQuizModal = function() {
+      const m = document.getElementById('quiz-modal');
+      if (m) { m.classList.add('hidden'); m.classList.remove('flex'); }
+    };
+
+    window.renderQuizQuestion = function() {
+      const data = window.topicsData[window.labState.activeSubject];
+      const q = data.quiz[window.labState.quizIndex];
+      document.getElementById('quiz-unit-label').innerText = `Module: ${data.title}`;
+      document.getElementById('quiz-q-curr').innerText = window.labState.quizIndex + 1;
+      document.getElementById('quiz-score-num').innerText = window.labState.quizScore;
+      document.getElementById('quiz-question-txt').innerText = q.q;
+
+      const optsList = document.getElementById('quiz-options-list');
+      optsList.innerHTML = '';
+      const fb = document.getElementById('quiz-feedback-box');
+      fb.classList.add('hidden');
+      document.getElementById('btn-next-question').classList.add('hidden');
+
+      q.opts.forEach((opt, idx) => {
+        const btn = document.createElement('button');
+        btn.className = "w-full text-left p-3 rounded-2xl glass-card hover:bg-white/10 transition border border-white/5 flex items-center justify-between text-xs";
+        btn.innerHTML = `<span>${opt}</span><span class="w-2.5 h-2.5 rounded-full border border-slate-500"></span>`;
+        btn.onclick = () => window.checkQuickAnswer(idx, q.ans, q.exp, btn);
+        optsList.appendChild(btn);
+      });
+    };
+
+    window.checkQuickAnswer = function(selected, correct, explanation, btnEl) {
+      const fb = document.getElementById('quiz-feedback-box');
+      fb.classList.remove('hidden');
+      const allBtns = document.getElementById('quiz-options-list').children;
+      for (let b of allBtns) b.disabled = true;
+
+      if (selected === correct) {
+        window.labState.quizScore++;
+        document.getElementById('quiz-score-num').innerText = window.labState.quizScore;
+        btnEl.classList.add('border-emerald-500', 'bg-emerald-500/20', 'text-emerald-300');
+        fb.className = "p-3 rounded-xl text-xs bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-mono";
+        fb.innerHTML = `<strong>Correct!</strong> ${explanation}`;
+        if (typeof confetti === 'function') confetti({ particleCount: 40, spread: 50 });
+      } else {
+        btnEl.classList.add('border-rose-500', 'bg-rose-500/20', 'text-rose-300');
+        allBtns[correct].classList.add('border-emerald-500', 'bg-emerald-500/10');
+        fb.className = "p-3 rounded-xl text-xs bg-rose-500/20 text-rose-300 border border-rose-500/30 font-mono";
+        fb.innerHTML = `<strong>Incorrect.</strong> ${explanation}`;
+      }
+
+      const nextBtn = document.getElementById('btn-next-question');
+      if (window.labState.quizIndex < window.topicsData[window.labState.activeSubject].quiz.length - 1) {
+        nextBtn.classList.remove('hidden');
+        nextBtn.innerText = "Next Question →";
+      } else {
+        nextBtn.classList.remove('hidden');
+        nextBtn.innerText = "Complete Assessment";
+      }
+    };
+
+    window.advanceQuizQuestion = function() {
+      const qList = window.topicsData[window.labState.activeSubject].quiz;
+      if (window.labState.quizIndex < qList.length - 1) {
+        window.labState.quizIndex++;
+        window.renderQuizQuestion();
+      } else {
+        window.closeQuizModal();
+        window.showQuickAlert(`Quiz Finished! Score: ${window.labState.quizScore}/${qList.length}`);
+        if (window.labState.quizScore === qList.length && typeof confetti === 'function') {
+          confetti({ particleCount: 100, spread: 90 });
+        }
+      }
+    };
+
+    let arenaScore = 0;
+    window.startArenaQuiz = function(subj) {
+      const data = window.topicsData[subj];
+      document.getElementById('arena-subject-title').innerText = `${data.title} Arena Quiz`;
+      const q = data.quiz[0];
+      document.getElementById('arena-question-text').innerText = q.q;
+      const cont = document.getElementById('arena-options-container');
+      cont.innerHTML = '';
+      const feedback = document.getElementById('arena-feedback');
+      feedback.classList.add('hidden');
+
+      q.opts.forEach((opt, idx) => {
+        const btn = document.createElement('button');
+        btn.className = "w-full text-left p-3 rounded-2xl glass-panel hover:bg-white/10 transition border border-white/5 flex items-center justify-between text-xs";
+        btn.innerHTML = `<span>${opt}</span><span class="w-2 h-2 rounded-full border border-slate-500"></span>`;
+        btn.onclick = () => {
+          feedback.classList.remove('hidden');
+          if (idx === q.ans) {
+            arenaScore += 100;
+            document.getElementById('arena-score').innerText = arenaScore;
+            feedback.className = "p-3 rounded-xl text-xs bg-emerald-500/20 text-emerald-300 border border-emerald-500/30";
+            feedback.innerHTML = `<strong>Correct! +100 Points!</strong> ${q.exp}`;
+            if (typeof confetti === 'function') confetti({ particleCount: 50, spread: 60 });
+          } else {
+            feedback.className = "p-3 rounded-xl text-xs bg-rose-500/20 text-rose-300 border border-rose-500/30";
+            feedback.innerHTML = `<strong>Incorrect.</strong> ${q.exp}`;
+          }
+        };
+        cont.appendChild(btn);
+      });
+    };
+
+    // =========================================================================
+    // 3D LAB STUDIO & CAMERA PRESETS
+    // =========================================================================
+
+    window.setLightTint = function(hex) {
+      if (window.scene) {
+        window.scene.children.forEach(c => {
+          if (c.isAmbientLight) c.color.setHex(hex);
+        });
+        window.showQuickAlert('Ambient light adjusted.');
+      }
+    };
+
+    window.adjustMeshRoughness = function(val) {
+      if (window.interactiveMeshes) {
+        window.interactiveMeshes.forEach(m => {
+          if (m.material && m.material.roughness !== undefined) {
+            m.material.roughness = parseFloat(val);
+          }
+        });
+      }
+    };
+
+    window.capture3DScreenshot = function() {
+      if (window.renderer && window.scene && window.camera) {
+        window.renderer.render(window.scene, window.camera);
+        const url = window.renderer.domElement.toDataURL('image/png');
+        const a = document.createElement('a');
+        a.download = `EDU3D-${window.labState.activeSubject}-Lab.png`;
+        a.href = url;
+        a.click();
+        window.showQuickAlert('3D Lab snapshot downloaded!');
+      }
+    };
+
+    window.adjustAutoRotate = function(val) {
+      if (window.controls) {
+        window.controls.autoRotateSpeed = parseFloat(val);
+      }
+    };
+
+    window.handleQuickSearch = function(query) {
+      if (!query) return;
+      const q = query.toLowerCase().trim();
+      const match = Object.keys(window.topicsData).find(k =>
+        k.includes(q) ||
+        window.topicsData[k].title.toLowerCase().includes(q) ||
+        window.topicsData[k].desc.toLowerCase().includes(q)
+      );
+      if (match) {
+        window.loadSubject(match);
+        window.showQuickAlert(`Switched to: ${window.topicsData[match].title}`);
+      }
+    };
+
+    window.changeSimulationSpeed = function(val) {
+      window.labState.simulationSpeed = parseFloat(val);
+      document.getElementById('hud-speed-label').innerText = `${val}x`;
+    };
+
+    window.toggleExplode = function(checked) {
+      window.labState.isExploded = checked;
+      window.showQuickAlert(checked ? 'Exploded model view active.' : 'Exploded view collapsed.');
+    };
+
+    window.toggleXRay = function(checked) {
+      window.labState.isXRay = checked;
+      if (window.interactiveMeshes) {
+        window.interactiveMeshes.forEach(m => {
+          if (m.material) {
+            m.material.wireframe = checked;
+          }
+        });
+      }
+      window.showQuickAlert(checked ? 'X-Ray wireframe enabled.' : 'Normal solid shading restored.');
+    };
+
+    window.toggleParticleTrails = function(checked) {
+      window.labState.showParticles = checked;
+      if (window.activeParticleSystem) {
+        window.activeParticleSystem.visible = checked;
+      }
+    };
+
+    window.setCameraPreset = function(preset) {
+      if (!window.camera || !window.controls) return;
+      const data = window.topicsData[window.labState.activeSubject];
+      if (preset === 'reset' || preset === 'orbit') {
+        window.camera.position.set(data.camPos[0], data.camPos[1], data.camPos[2]);
+        window.controls.target.set(data.targetPos[0], data.targetPos[1], data.targetPos[2]);
+      } else if (preset === 'top') {
+        window.camera.position.set(0, data.camPos[2], 0.001);
+        window.controls.target.set(0, 0, 0);
+      } else if (preset === 'close') {
+        window.camera.position.set(0, 0, data.camPos[2] * 0.7);
+        window.controls.target.set(0, 0, 0);
+      }
+      window.controls.update();
+      window.showQuickAlert(`Camera angle adjusted: ${preset}`);
+    };
+
+    // =========================================================================
+    // THREE.JS SPATIAL ENGINE & 6 SUBJECT LAB CREATION
+    // =========================================================================
+
+    let scene, camera, renderer, controls;
+    let interactiveMeshes = [];
+    let subjectGroups = {};
+    let activeSubjectGroup = null;
+    let activeParticleSystem = null;
+    let clock = new THREE.Clock();
+
+    window.initThreeEngine = function() {
+      const canvas = document.getElementById('webgl-canvas');
+      if (!canvas) return;
+
+      scene = new THREE.Scene();
+      window.scene = scene;
+      scene.background = new THREE.Color(0xf0f4f9);
+      scene.fog = new THREE.FogExp2(0xf0f4f9, 0.012);
+
+      camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
+      window.camera = camera;
+      camera.position.set(0, 8, 22);
+
+      renderer = new THREE.WebGLRenderer({
+        canvas: canvas,
+        antialias: true,
+        alpha: false,
+        powerPreference: "high-performance",
+        preserveDrawingBuffer: true
+      });
+      window.renderer = renderer;
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+      renderer.toneMapping = THREE.ACESFilmicToneMapping;
+      renderer.toneMappingExposure = 1.15;
+
+      // OrbitControls with LOCKED ZOOM and LOCKED PANNING
+      controls = new THREE.OrbitControls(camera, renderer.domElement);
+      window.controls = controls;
+      controls.enableDamping = true;
+      controls.dampingFactor = 0.05;
+      controls.enableZoom = false; // LOCKED: Prevents zoom in/out
+      controls.enablePan = false;  // LOCKED: Keeps camera centered
+      controls.enableRotate = true;
+      controls.autoRotate = true;
+      controls.autoRotateSpeed = 0.6;
+
+      // Lighting Setup
+      const ambient = new THREE.AmbientLight(0xffffff, 0.95);
+      scene.add(ambient);
+
+      const dirLight1 = new THREE.DirectionalLight(0x0284c7, 1.3);
+      dirLight1.position.set(15, 20, 15);
+      scene.add(dirLight1);
+
+      const dirLight2 = new THREE.DirectionalLight(0xf59e0b, 0.8);
+      dirLight2.position.set(-15, -10, -15);
+      scene.add(dirLight2);
+
+      // Deep Space Particles (Soft Slate Blue)
+      const starGeo = new THREE.BufferGeometry();
+      const starPos = [];
+      for (let i = 0; i < 900; i++) {
+        starPos.push(
+          (Math.random() - 0.5) * 160,
+          (Math.random() - 0.5) * 160,
+          (Math.random() - 0.5) * 160
+        );
+      }
+      starGeo.setAttribute('position', new THREE.Float32BufferAttribute(starPos, 3));
+      const starMat = new THREE.PointsMaterial({ color: 0x94a3b8, size: 0.75, transparent: true, opacity: 0.5 });
+      scene.add(new THREE.Points(starGeo, starMat));
+
+      // Build 6 Interactive Subject Lab Groups
+      window.buildSubjectLabs();
+
+      // Load Initial Subject (Mathematics)
+      window.loadSubject('math');
+
+      // Raycaster for 3D Node Inspection
+      const raycaster = new THREE.Raycaster();
+      const mouse = new THREE.Vector2();
+
+      function onPointerMove(e) {
+        mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
+        mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
+        raycaster.setFromCamera(mouse, camera);
+        const intersects = raycaster.intersectObjects(interactiveMeshes);
+        const tooltip = document.getElementById('model-tooltip');
+        if (intersects.length > 0) {
+          const hit = intersects[0].object;
+          document.body.style.cursor = 'pointer';
+          if (tooltip && hit.userData && hit.userData.label) {
+            document.getElementById('tooltip-title').innerText = hit.userData.label;
+            tooltip.style.left = `${e.clientX}px`;
+            tooltip.style.top = `${e.clientY - 15}px`;
+            tooltip.style.opacity = '1';
+          }
+        } else {
+          document.body.style.cursor = 'default';
+          if (tooltip) tooltip.style.opacity = '0';
+        }
+      }
+
+      function onPointerClick(e) {
+        if (e.target.tagName === 'BUTTON' || e.target.tagName === 'INPUT' || e.target.closest('aside') || e.target.closest('header')) {
+          return;
+        }
+        mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
+        mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
+        raycaster.setFromCamera(mouse, camera);
+        const intersects = raycaster.intersectObjects(interactiveMeshes);
+        if (intersects.length > 0) {
+          const hit = intersects[0].object;
+          if (hit.userData && hit.userData.label) {
+            document.getElementById('telemetry-object-name').innerText = hit.userData.label;
+            window.showQuickAlert(`Inspecting: ${hit.userData.label}`);
+          }
+        }
+      }
+
+      window.addEventListener('mousemove', onPointerMove);
+      window.addEventListener('click', onPointerClick);
+
+      window.addEventListener('resize', () => {
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        if (annotCanvas) {
+          annotCanvas.width = window.innerWidth;
+          annotCanvas.height = window.innerHeight;
+        }
+      });
+
+      // Animation Loop
+      function animate() {
+        requestAnimationFrame(animate);
+        const delta = clock.getDelta() * window.labState.simulationSpeed;
+
+        if (controls) controls.update();
+
+        // Subject Specific Animations
+        if (activeSubjectGroup && activeSubjectGroup.userData && activeSubjectGroup.userData.update) {
+          activeSubjectGroup.userData.update(delta);
+        }
+
+        renderer.render(scene, camera);
+      }
+      animate();
+    };
+
+    window.buildSubjectLabs = function() {
+      // 1. MATHEMATICS & TOPOLOGY LAB
+      const mathGroup = new THREE.Group();
+      const knotGeo = new THREE.TorusKnotGeometry(4.0, 1.0, 160, 24, 3, 7);
+      const knotMat = new THREE.MeshStandardMaterial({
+        color: 0xf59e0b,
+        metalness: 0.85,
+        roughness: 0.25,
+        wireframe: false
+      });
+      const knotMesh = new THREE.Mesh(knotGeo, knotMat);
+      knotMesh.userData = { label: 'Torus Knot T(3, 7)' };
+      mathGroup.add(knotMesh);
+
+      const knotWireGeo = new THREE.TorusKnotGeometry(4.02, 1.01, 80, 12, 3, 7);
+      const knotWireMat = new THREE.MeshBasicMaterial({ color: 0xffedd5, wireframe: true, transparent: true, opacity: 0.25 });
+      const knotWireMesh = new THREE.Mesh(knotWireGeo, knotWireMat);
+      mathGroup.add(knotWireMesh);
+
+      const icoGeo = new THREE.IcosahedronGeometry(7.5, 0);
+      const icoMat = new THREE.MeshBasicMaterial({ color: 0x38bdf8, wireframe: true, transparent: true, opacity: 0.35 });
+      const icoMesh = new THREE.Mesh(icoGeo, icoMat);
+      icoMesh.userData = { label: 'Dual Icosahedron Wireframe' };
+      mathGroup.add(icoMesh);
+
+      const gridHelper = new THREE.GridHelper(20, 20, 0x0284c7, 0x1e293b);
+      gridHelper.position.y = -6;
+      mathGroup.add(gridHelper);
+
+      mathGroup.userData.update = (dt) => {
+        knotMesh.rotation.x += 0.3 * dt;
+        knotMesh.rotation.y += 0.4 * dt;
+        knotWireMesh.rotation.x = knotMesh.rotation.x;
+        knotWireMesh.rotation.y = knotMesh.rotation.y;
+        icoMesh.rotation.y -= 0.15 * dt;
+        if (window.labState.isExploded) {
+          knotMesh.scale.set(1.25, 1.25, 1.25);
+          knotWireMesh.scale.set(1.25, 1.25, 1.25);
+          icoMesh.scale.set(1.2, 1.2, 1.2);
+        } else {
+          knotMesh.scale.set(1, 1, 1);
+          knotWireMesh.scale.set(1, 1, 1);
+          icoMesh.scale.set(1, 1, 1);
+        }
+      };
+      subjectGroups.math = mathGroup;
+
+      // 2. WORLD HISTORY & GIZA LAB
+      const histGroup = new THREE.Group();
+      const baseGeo = new THREE.BoxGeometry(18, 0.5, 18);
+      const baseMat = new THREE.MeshStandardMaterial({ color: 0x78716c, roughness: 0.9 });
+      const baseMesh = new THREE.Mesh(baseGeo, baseMat);
+      baseMesh.position.y = -2.25;
+      baseMesh.userData = { label: 'Limestone Bedrock Platform' };
+      histGroup.add(baseMesh);
+
+      const pyrGeo = new THREE.ConeGeometry(9, 8, 4);
+      const pyrMat = new THREE.MeshStandardMaterial({
+        color: 0xd97706,
+        roughness: 0.8,
+        metalness: 0.15,
+        flatShading: true
+      });
+      const pyrMesh = new THREE.Mesh(pyrGeo, pyrMat);
+      pyrMesh.position.y = 1.75;
+      pyrMesh.rotation.y = Math.PI / 4;
+      pyrMesh.userData = { label: 'Great Pyramid of Khufu (Casing Stones)' };
+      histGroup.add(pyrMesh);
+
+      const capGeo = new THREE.ConeGeometry(2.2, 2.0, 4);
+      const capMat = new THREE.MeshStandardMaterial({ color: 0xfef08a, metalness: 0.95, roughness: 0.1 });
+      const capMesh = new THREE.Mesh(capGeo, capMat);
+      capMesh.position.y = 4.75;
+      capMesh.rotation.y = Math.PI / 4;
+      capMesh.userData = { label: 'Gold Electrum Pyramidion Capstone' };
+      histGroup.add(capMesh);
+
+      const chamberGeo = new THREE.BoxGeometry(2.4, 1.4, 3.2);
+      const chamberMat = new THREE.MeshStandardMaterial({ color: 0xef4444, emissive: 0x7f1d1d, wireframe: true });
+      const chamberMesh = new THREE.Mesh(chamberGeo, chamberMat);
+      chamberMesh.position.set(0, 2.5, 0);
+      chamberMesh.userData = { label: "King's Chamber & Granite Sarcophagus" };
+      histGroup.add(chamberMesh);
+
+      const galleryGeo = new THREE.BoxGeometry(0.8, 0.8, 5.0);
+      const galleryMat = new THREE.MeshBasicMaterial({ color: 0x38bdf8, wireframe: true });
+      const galleryMesh = new THREE.Mesh(galleryGeo, galleryMat);
+      galleryMesh.position.set(0, 1.0, 2.0);
+      galleryMesh.rotation.x = Math.PI / 6;
+      galleryMesh.userData = { label: 'Grand Gallery Ascending Shaft' };
+      histGroup.add(galleryMesh);
+
+      histGroup.userData.update = (dt) => {
+        if (window.labState.isExploded) {
+          capMesh.position.y = 7.0;
+          pyrMesh.material.transparent = true;
+          pyrMesh.material.opacity = 0.45;
+        } else {
+          capMesh.position.y = 4.75;
+          pyrMesh.material.transparent = false;
+          pyrMesh.material.opacity = 1.0;
+        }
+      };
+      subjectGroups.history = histGroup;
+
+      // 3. CELL BIOLOGY LAB (COMPREHENSIVE ORGANELLE SYSTEM)
+      const cellGroup = new THREE.Group();
+      
+      // Outer Plasma Membrane (Semi-transparent with inner sheen)
+      const membraneGeo = new THREE.SphereGeometry(5.8, 36, 36);
+      const membraneMat = new THREE.MeshStandardMaterial({
+        color: 0x10b981,
+        transparent: true,
+        opacity: 0.38,
+        roughness: 0.2,
+        side: THREE.DoubleSide
+      });
+      const membrane = new THREE.Mesh(membraneGeo, membraneMat);
+      membrane.userData = { label: 'Cellular Plasma Membrane' };
+      cellGroup.add(membrane);
+
+      // Nucleus with Cutaway Window
+      const nucGroup = new THREE.Group();
+      const nucGeo = new THREE.SphereGeometry(2.3, 28, 28, 0, Math.PI * 1.6);
+      const nucMat = new THREE.MeshStandardMaterial({
+        color: 0x8b5cf6,
+        roughness: 0.35,
+        side: THREE.DoubleSide
+      });
+      const nucleus = new THREE.Mesh(nucGeo, nucMat);
+      nucleus.userData = { label: 'Cell Nucleus & Nuclear Envelope' };
+      nucGroup.add(nucleus);
+
+      // Dense Nucleolus Core
+      const nucleolusGeo = new THREE.SphereGeometry(0.9, 16, 16);
+      const nucleolusMat = new THREE.MeshStandardMaterial({
+        color: 0xec4899,
+        emissive: 0x831843,
+        roughness: 0.2
+      });
+      const nucleolus = new THREE.Mesh(nucleolusGeo, nucleolusMat);
+      nucleolus.userData = { label: 'Dense Nucleolus (Ribosomal RNA)' };
+      nucGroup.add(nucleolus);
+      cellGroup.add(nucGroup);
+
+      // 6 Floating Mitochondria with Inner Cristae Folds
+      const mitoList = [];
+      for (let i = 0; i < 6; i++) {
+        const singleMito = new THREE.Group();
+        const outerGeo = new THREE.CylinderGeometry(0.45, 0.45, 1.5, 16);
+        const outerMat = new THREE.MeshStandardMaterial({ color: 0xf59e0b, roughness: 0.3 });
+        const mBody = new THREE.Mesh(outerGeo, outerMat);
+        singleMito.add(mBody);
+
+        const capTop = new THREE.Mesh(new THREE.SphereGeometry(0.45, 16, 8), outerMat);
+        capTop.position.y = 0.75;
+        singleMito.add(capTop);
+
+        const capBot = new THREE.Mesh(new THREE.SphereGeometry(0.45, 16, 8), outerMat);
+        capBot.position.y = -0.75;
+        singleMito.add(capBot);
+
+        // Inner cristae rings
+        const cristaeGeo = new THREE.TorusGeometry(0.35, 0.06, 8, 16);
+        const cristaeMat = new THREE.MeshBasicMaterial({ color: 0xfef08a });
+        const cristae = new THREE.Mesh(cristaeGeo, cristaeMat);
+        cristae.rotation.x = Math.PI / 2;
+        singleMito.add(cristae);
+
+        const theta = (i / 6) * Math.PI * 2;
+        const radius = 3.6 + (i % 2) * 0.5;
+        singleMito.position.set(Math.cos(theta) * radius, (Math.sin(theta * 2) * 1.2), Math.sin(theta) * radius);
+        singleMito.rotation.set(Math.random() * 0.5, theta, Math.PI / 3);
+        singleMito.userData = { label: 'Mitochondrion (ATP Synthase & Cristae)' };
+        mBody.userData = singleMito.userData;
+        cellGroup.add(singleMito);
+        mitoList.push(singleMito);
+      }
+
+      // Endoplasmic Reticulum (Curved Ribbon Folds)
+      const erGeo = new THREE.TorusGeometry(3.3, 0.22, 12, 40, Math.PI * 1.2);
+      const erMat = new THREE.MeshStandardMaterial({ color: 0x3b82f6, roughness: 0.3 });
+      const erMesh = new THREE.Mesh(erGeo, erMat);
+      erMesh.position.set(0, 0.3, 0);
+      erMesh.rotation.x = Math.PI / 2.5;
+      erMesh.userData = { label: 'Rough Endoplasmic Reticulum' };
+      cellGroup.add(erMesh);
+
+      // Chloroplast / Ribosome clusters
+      for (let j = 0; j < 4; j++) {
+        const chloroGeo = new THREE.CylinderGeometry(0.7, 0.7, 0.35, 16);
+        const chloroMat = new THREE.MeshStandardMaterial({ color: 0x22c55e, roughness: 0.3 });
+        const chloro = new THREE.Mesh(chloroGeo, chloroMat);
+        const ang = (j / 4) * Math.PI * 2 + Math.PI / 6;
+        chloro.position.set(Math.cos(ang) * 3.7, -1.8 + j * 0.7, Math.sin(ang) * 3.7);
+        chloro.rotation.x = Math.PI / 4;
+        chloro.userData = { label: 'Chloroplast (Thylakoid Granum)' };
+        cellGroup.add(chloro);
+      }
+
+      cellGroup.userData.update = (dt) => {
+        nucGroup.rotation.y += 0.25 * dt;
+        erMesh.rotation.z += 0.15 * dt;
+        mitoList.forEach((m, idx) => {
+          m.rotation.y += 0.3 * dt;
+        });
+        if (window.labState.isExploded) {
+          membrane.scale.set(1.25, 1.25, 1.25);
+        } else {
+          membrane.scale.set(1, 1, 1);
+        }
+      };
+      subjectGroups.cell = cellGroup;
+
+      // 4. ANATOMY HEART LAB (COMPOUND ANATOMICAL STRUCTURE & BLOOD FLOW)
+      const heartGroup = new THREE.Group();
+
+      // Left Ventricle (Larger Thick Muscle)
+      const lvGeo = new THREE.SphereGeometry(3.2, 32, 32);
+      const lvMat = new THREE.MeshStandardMaterial({ color: 0xbe123c, roughness: 0.35 });
+      const lvMesh = new THREE.Mesh(lvGeo, lvMat);
+      lvMesh.position.set(1.0, -1.2, 0);
+      lvMesh.scale.set(1.0, 1.4, 0.9);
+      lvMesh.userData = { label: 'Left Ventricle (Systemic Myocardium)' };
+      heartGroup.add(lvMesh);
+
+      // Right Ventricle (Anterior Muscle)
+      const rvGeo = new THREE.SphereGeometry(2.7, 32, 32);
+      const rvMat = new THREE.MeshStandardMaterial({ color: 0x9f1239, roughness: 0.4 });
+      const rvMesh = new THREE.Mesh(rvGeo, rvMat);
+      rvMesh.position.set(-1.4, -1.0, 0.4);
+      rvMesh.scale.set(0.9, 1.3, 0.85);
+      rvMesh.userData = { label: 'Right Ventricle (Pulmonary Pump)' };
+      heartGroup.add(rvMesh);
+
+      // Left & Right Atria
+      const laMesh = new THREE.Mesh(new THREE.SphereGeometry(1.8, 24, 24), new THREE.MeshStandardMaterial({ color: 0xd97706, roughness: 0.4 }));
+      laMesh.position.set(1.4, 1.8, -0.4);
+      laMesh.userData = { label: 'Left Atrium (Receives Oxygenated Blood)' };
+      heartGroup.add(laMesh);
+
+      const raMesh = new THREE.Mesh(new THREE.SphereGeometry(1.9, 24, 24), new THREE.MeshStandardMaterial({ color: 0x0284c7, roughness: 0.4 }));
+      raMesh.position.set(-1.8, 1.6, 0.2);
+      raMesh.userData = { label: 'Right Atrium (Receives Venous Blood)' };
+      heartGroup.add(raMesh);
+
+      // Aorta Arch (High detail curved tube)
+      const aortaCurve = new THREE.CubicBezierCurve3(
+        new THREE.Vector3(0.3, 1.2, 0),
+        new THREE.Vector3(0.5, 4.8, 0),
+        new THREE.Vector3(-1.8, 4.8, 0),
+        new THREE.Vector3(-2.2, 2.0, -0.6)
+      );
+      const aortaGeo = new THREE.TubeGeometry(aortaCurve, 32, 0.75, 16, false);
+      const aortaMat = new THREE.MeshStandardMaterial({ color: 0xef4444, roughness: 0.3, metalness: 0.1 });
+      const aortaMesh = new THREE.Mesh(aortaGeo, aortaMat);
+      aortaMesh.userData = { label: 'Systemic Aortic Arch' };
+      heartGroup.add(aortaMesh);
+
+      // 3 Branching Arteries (Brachiocephalic, Carotid, Subclavian)
+      for (let k = 0; k < 3; k++) {
+        const branchGeo = new THREE.CylinderGeometry(0.2, 0.22, 1.3, 12);
+        const branchMesh = new THREE.Mesh(branchGeo, aortaMat);
+        branchMesh.position.set(-0.6 + k * 0.65, 4.6, 0.1);
+        branchMesh.rotation.z = -0.15 + k * 0.1;
+        branchMesh.userData = { label: `Aortic Branch ${k+1} (Carotid/Subclavian)` };
+        heartGroup.add(branchMesh);
+      }
+
+      // Vena Cava (Deoxygenated Blue Vessel)
+      const cavaGeo = new THREE.CylinderGeometry(0.7, 0.75, 4.2, 16);
+      const cavaMat = new THREE.MeshStandardMaterial({ color: 0x2563eb, roughness: 0.35 });
+      const cavaMesh = new THREE.Mesh(cavaGeo, cavaMat);
+      cavaMesh.position.set(-2.5, 2.2, -0.4);
+      cavaMesh.userData = { label: 'Superior Vena Cava' };
+      heartGroup.add(cavaMesh);
+
+      // Animated Red (Oxygenated) & Blue (Venous) Blood Flow Particles
+      const bloodGeo = new THREE.BufferGeometry();
+      const bloodCount = 180;
+      const bloodPositions = new Float32Array(bloodCount * 3);
+      const bloodColors = new Float32Array(bloodCount * 3);
+
+      for (let b = 0; b < bloodCount; b++) {
+        const isOxygenated = b % 2 === 0;
+        bloodPositions[b * 3] = (isOxygenated ? 0.6 : -1.5) + (Math.random() - 0.5) * 1.5;
+        bloodPositions[b * 3 + 1] = (Math.random() - 0.5) * 6;
+        bloodPositions[b * 3 + 2] = (Math.random() - 0.5) * 1.5;
+
+        if (isOxygenated) {
+          bloodColors[b * 3] = 1.0;
+          bloodColors[b * 3 + 1] = 0.15;
+          bloodColors[b * 3 + 2] = 0.2;
+        } else {
+          bloodColors[b * 3] = 0.15;
+          bloodColors[b * 3 + 1] = 0.45;
+          bloodColors[b * 3 + 2] = 1.0;
+        }
+      }
+      bloodGeo.setAttribute('position', new THREE.BufferAttribute(bloodPositions, 3));
+      bloodGeo.setAttribute('color', new THREE.BufferAttribute(bloodColors, 3));
+      const bloodMat = new THREE.PointsMaterial({
+        size: 0.35,
+        vertexColors: true,
+        transparent: true,
+        opacity: 0.85
+      });
+      const bloodParticles = new THREE.Points(bloodGeo, bloodMat);
+      heartGroup.add(bloodParticles);
+
+      let heartBPM = 0;
+      heartGroup.userData.update = (dt) => {
+        heartBPM += dt * 5.0; // ~70-75 BPM simulation
+        const pulse = 1.0 + Math.sin(heartBPM) * 0.08 + Math.max(0, Math.sin(heartBPM * 2.0)) * 0.04;
+        lvMesh.scale.set(pulse, pulse * 1.4, pulse * 0.9);
+        rvMesh.scale.set(pulse * 0.9, pulse * 1.3, pulse * 0.85);
+
+        // Stream blood particles
+        const posArr = bloodGeo.attributes.position.array;
+        for (let b = 0; b < bloodCount; b++) {
+          posArr[b * 3 + 1] += dt * 3.5;
+          if (posArr[b * 3 + 1] > 4.5) {
+            posArr[b * 3 + 1] = -3.5;
+          }
+        }
+        bloodGeo.attributes.position.needsUpdate = true;
+      };
+      subjectGroups.heart = heartGroup;
+
+      // 5. PARTICLE CHEMISTRY LAB (CARBON-12 COMPACT NUCLEUS + DUAL VALENCE SHELLS)
+      const atomGroup = new THREE.Group();
+      const nucCluster = new THREE.Group();
+
+      const pGeo = new THREE.SphereGeometry(0.6, 16, 16);
+      const pMat = new THREE.MeshStandardMaterial({
+        color: 0xef4444,
+        roughness: 0.2,
+        emissive: 0x7f1d1d
+      });
+      const nGeo = new THREE.SphereGeometry(0.6, 16, 16);
+      const nMat = new THREE.MeshStandardMaterial({
+        color: 0x2563eb,
+        roughness: 0.2,
+        emissive: 0x1e3a8a
+      });
+
+      // 6 Protons and 6 Neutrons packed tightly
+      const nucleusOffsets = [
+        [0.5, 0.5, 0.5], [-0.5, -0.5, -0.5], [0.5, -0.5, 0.5], [-0.5, 0.5, -0.5],
+        [0.6, 0.5, -0.5], [-0.6, -0.5, 0.5], [0, 0.8, 0], [0, -0.8, 0],
+        [0.8, 0, 0], [-0.8, 0, 0], [0, 0, 0.8], [0, 0, -0.8]
+      ];
+
+      nucleusOffsets.forEach((pos, idx) => {
+        const isProton = idx % 2 === 0;
+        const sphere = new THREE.Mesh(isProton ? pGeo : nGeo, isProton ? pMat : nMat);
+        sphere.position.set(pos[0] * 1.05, pos[1] * 1.05, pos[2] * 1.05);
+        sphere.userData = { label: isProton ? 'Proton (+1e elementary charge)' : 'Neutron (Neutral 0e charge)' };
+        nucCluster.add(sphere);
+      });
+      atomGroup.add(nucCluster);
+
+      // K-Shell (n=1, Radius=3.8, Holds 2 Electrons)
+      const kRingMat = new THREE.MeshBasicMaterial({ color: 0x38bdf8, wireframe: true, transparent: true, opacity: 0.45 });
+      const kRing = new THREE.Mesh(new THREE.TorusGeometry(3.8, 0.04, 12, 64), kRingMat);
+      kRing.rotation.x = Math.PI / 2.5;
+      atomGroup.add(kRing);
+
+      // L-Shell (n=2, Radius=6.8, Holds 4 Electrons)
+      const lRingMat = new THREE.MeshBasicMaterial({ color: 0xa855f7, wireframe: true, transparent: true, opacity: 0.35 });
+      const lRing1 = new THREE.Mesh(new THREE.TorusGeometry(6.8, 0.04, 12, 64), lRingMat);
+      lRing1.rotation.y = Math.PI / 3;
+      const lRing2 = new THREE.Mesh(new THREE.TorusGeometry(6.8, 0.04, 12, 64), lRingMat);
+      lRing2.rotation.x = Math.PI / 4;
+      atomGroup.add(lRing1);
+      atomGroup.add(lRing2);
+
+      // 6 Glowing Revolving Electrons (2 in inner shell, 4 in valence shell)
+      const eGeo = new THREE.SphereGeometry(0.32, 16, 16);
+      const eMat = new THREE.MeshStandardMaterial({
+        color: 0x38bdf8,
+        emissive: 0x0284c7,
+        roughness: 0.1
+      });
+      const electronMeshes = [];
+      for (let e = 0; e < 6; e++) {
+        const eMesh = new THREE.Mesh(eGeo, eMat);
+        eMesh.userData = { label: e < 2 ? 'Inner 1s Core Electron (-1e)' : 'Valence 2s/2p Electron (-1e)' };
+        atomGroup.add(eMesh);
+        electronMeshes.push(eMesh);
+      }
+
+      let atomSpin = 0;
+      atomGroup.userData.update = (dt) => {
+        atomSpin += dt * 2.8;
+        nucCluster.rotation.y += 0.4 * dt;
+        nucCluster.rotation.x += 0.2 * dt;
+
+        // Inner 2 electrons
+        for (let i = 0; i < 2; i++) {
+          const ang = atomSpin * 1.5 + i * Math.PI;
+          electronMeshes[i].position.set(Math.cos(ang) * 3.8, Math.sin(ang) * 1.6, Math.sin(ang) * 3.5);
+        }
+        // Outer 4 valence electrons
+        for (let i = 2; i < 6; i++) {
+          const ang = atomSpin + ((i - 2) * Math.PI) / 2;
+          const r = 6.8;
+          electronMeshes[i].position.set(
+            Math.cos(ang) * r,
+            Math.sin(ang) * (i % 2 === 0 ? r * 0.7 : -r * 0.7),
+            Math.sin(ang * 1.2) * (r * 0.6)
+          );
+        }
+      };
+      subjectGroups.atom = atomGroup;
+
+      // 6. MECHANICS & 4-STROKE ENGINE LAB (PISTON, CONNECTING ROD, CRANKSHAFT, INTERMESHED GEARS)
+      const engGroup = new THREE.Group();
+
+      // Transparent Cylinder Casing with combustion heat rings
+      const cylGeo = new THREE.CylinderGeometry(3.6, 3.6, 8.5, 32, 1, true);
+      const cylMat = new THREE.MeshStandardMaterial({
+        color: 0x818cf8,
+        transparent: true,
+        opacity: 0.35,
+        roughness: 0.1,
+        metalness: 0.1,
+        side: THREE.DoubleSide
+      });
+      const cylinder = new THREE.Mesh(cylGeo, cylMat);
+      cylinder.position.y = 2.0;
+      cylinder.userData = { label: 'Bore Combustion Cylinder (Transparent Casing)' };
+      engGroup.add(cylinder);
+
+      // Reciprocating Piston Head
+      const pistonGeo = new THREE.CylinderGeometry(3.45, 3.45, 2.2, 32);
+      const pistonMat = new THREE.MeshStandardMaterial({
+        color: 0xe2e8f0,
+        metalness: 0.85,
+        roughness: 0.25
+      });
+      const piston = new THREE.Mesh(pistonGeo, pistonMat);
+      piston.position.y = 2.0;
+      piston.userData = { label: 'Reciprocating Piston Head (Compression Ring)' };
+      engGroup.add(piston);
+
+      // Connecting Rod
+      const rodGeo = new THREE.CylinderGeometry(0.35, 0.45, 4.8, 16);
+      const rodMat = new THREE.MeshStandardMaterial({
+        color: 0x94a3b8,
+        metalness: 0.9,
+        roughness: 0.2
+      });
+      const conRod = new THREE.Mesh(rodGeo, rodMat);
+      conRod.userData = { label: 'Forged Steel Connecting Rod' };
+      engGroup.add(conRod);
+
+      // Crankshaft Counterweight & Pin
+      const crankShaft = new THREE.Group();
+      crankShaft.position.set(0, -3.2, 0);
+
+      const crankWebGeo = new THREE.BoxGeometry(1.6, 3.0, 0.6);
+      const crankWebMat = new THREE.MeshStandardMaterial({ color: 0x64748b, metalness: 0.8, roughness: 0.3 });
+      const crankWeb = new THREE.Mesh(crankWebGeo, crankWebMat);
+      crankWeb.position.set(0, 0.7, 0);
+      crankShaft.add(crankWeb);
+
+      const crankPinGeo = new THREE.CylinderGeometry(0.35, 0.35, 1.0, 16);
+      const crankPin = new THREE.Mesh(crankPinGeo, rodMat);
+      crankPin.rotation.x = Math.PI / 2;
+      crankPin.position.set(0, 1.8, 0);
+      crankShaft.add(crankPin);
+      engGroup.add(crankShaft);
+
+      // 2 Intermeshed Counter-Rotating Spur Gears
+      const gear1 = new THREE.Group();
+      gear1.position.set(-3.2, -4.5, 0);
+      const gearDisc1 = new THREE.Mesh(new THREE.CylinderGeometry(2.2, 2.2, 0.5, 24), new THREE.MeshStandardMaterial({ color: 0xf59e0b, metalness: 0.85, roughness: 0.2 }));
+      gearDisc1.rotation.x = Math.PI / 2;
+      gear1.add(gearDisc1);
+      // 12 Gear Teeth
+      for (let t = 0; t < 12; t++) {
+        const tooth = new THREE.Mesh(new THREE.BoxGeometry(0.35, 0.45, 0.5), new THREE.MeshStandardMaterial({ color: 0xd97706, metalness: 0.85 }));
+        const a = (t / 12) * Math.PI * 2;
+        tooth.position.set(Math.cos(a) * 2.3, Math.sin(a) * 2.3, 0);
+        tooth.rotation.z = a;
+        gear1.add(tooth);
+      }
+      gear1.userData = { label: 'Drive Spur Gear (Crankspeed Ratio 1:1)' };
+      engGroup.add(gear1);
+
+      const gear2 = new THREE.Group();
+      gear2.position.set(1.4, -4.5, 0);
+      const gearDisc2 = new THREE.Mesh(new THREE.CylinderGeometry(2.2, 2.2, 0.5, 24), new THREE.MeshStandardMaterial({ color: 0x38bdf8, metalness: 0.85, roughness: 0.2 }));
+      gearDisc2.rotation.x = Math.PI / 2;
+      gear2.add(gearDisc2);
+      for (let t = 0; t < 12; t++) {
+        const tooth = new THREE.Mesh(new THREE.BoxGeometry(0.35, 0.45, 0.5), new THREE.MeshStandardMaterial({ color: 0x0284c7, metalness: 0.85 }));
+        const a = (t / 12) * Math.PI * 2 + (Math.PI / 12);
+        tooth.position.set(Math.cos(a) * 2.3, Math.sin(a) * 2.3, 0);
+        tooth.rotation.z = a;
+        gear2.add(tooth);
+      }
+      gear2.userData = { label: 'Driven Camshaft Gear (Intermeshed)' };
+      engGroup.add(gear2);
+
+      let crankAngle = 0;
+      engGroup.userData.update = (dt) => {
+        crankAngle += dt * 4.5;
+        crankShaft.rotation.z = crankAngle;
+
+        // Kinematics: Piston height determined by crank angle
+        const strokeRadius = 1.6;
+        const pinY = -3.2 + Math.cos(crankAngle) * strokeRadius;
+        const pinX = -Math.sin(crankAngle) * strokeRadius;
+        
+        piston.position.y = 2.0 + Math.cos(crankAngle) * strokeRadius;
+
+        // Connecting rod spans between pin and piston center
+        conRod.position.set(pinX * 0.5, (pinY + piston.position.y) * 0.5, 0);
+        conRod.rotation.z = -Math.atan2(pinX, piston.position.y - pinY);
+
+        // Synchronous counter-rotation of intermeshed gears
+        gear1.rotation.z = crankAngle;
+        gear2.rotation.z = -crankAngle;
+      };
+      subjectGroups.engine = engGroup;
+    };
+
+    window.loadSubject = function(subjectKey) {
+      if (!subjectGroups[subjectKey]) {
+        console.warn(`Subject ${subjectKey} not ready yet.`);
+        return;
+      }
+      window.labState.activeSubject = subjectKey;
+
+      // Detach prior active lab
+      if (activeSubjectGroup) {
+        scene.remove(activeSubjectGroup);
+      }
+
+      activeSubjectGroup = subjectGroups[subjectKey];
+      scene.add(activeSubjectGroup);
+
+      // Re-index interactive meshes for click/inspection
+      interactiveMeshes = [];
+      activeSubjectGroup.traverse(child => {
+        if (child.isMesh && child.userData && child.userData.label) {
+          interactiveMeshes.push(child);
+        }
+      });
+      window.interactiveMeshes = interactiveMeshes;
+
+      // Update HUD Topic Metadata
+      const data = window.topicsData[subjectKey];
+      if (data) {
+        const tag = document.getElementById('hud-topic-tag');
+        const title = document.getElementById('hud-topic-title');
+        const desc = document.getElementById('hud-topic-desc');
+        const exploreBtn = document.getElementById('hud-explore-btn-text');
+        const telObj = document.getElementById('telemetry-object-name');
+        const p1 = document.getElementById('tel-param1');
+        const p2 = document.getElementById('tel-param2');
+        const p3 = document.getElementById('tel-param3');
+
+        if (tag) tag.innerText = data.tag;
+        if (title) title.innerText = data.title;
+        if (desc) desc.innerText = data.desc;
+        if (exploreBtn) exploreBtn.innerText = data.exploreBtn;
+        if (telObj) telObj.innerText = data.telObj;
+        if (p1) p1.innerText = data.p1;
+        if (p2) p2.innerText = data.p2;
+        if (p3) p3.innerText = data.p3;
+
+        // Reset camera to subject coordinate with locked zoom
+        if (camera && controls) {
+          camera.position.set(data.camPos[0], data.camPos[1], data.camPos[2]);
+          controls.target.set(data.targetPos[0], data.targetPos[1], data.targetPos[2]);
+          controls.update();
+        }
+
+        // Update formulas overlay if open
+        const pOverlay = document.getElementById('physics-overlay');
+        if (pOverlay && !pOverlay.classList.contains('hidden')) {
+          document.getElementById('physics-overlay-content').innerHTML = data.formulas;
+        }
+      }
+
+      // Update BOTH Sidebar and Bottom Dock active highlights
+      const catKeys = ['math', 'history', 'cell', 'heart', 'atom', 'engine'];
+      catKeys.forEach(k => {
+        const sideBtn = document.getElementById(`sub-${k}`);
+        const dockBtn = document.getElementById(`dock-btn-${k}`);
+        const isCurrent = (k === subjectKey);
+
+        if (sideBtn) {
+          sideBtn.className = isCurrent
+            ? "w-full text-left flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs text-amber-900 bg-amber-100/90 font-bold transition border border-amber-200"
+            : "w-full text-left flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs text-slate-600 hover:text-slate-900 transition";
+        }
+        if (dockBtn) {
+          dockBtn.className = isCurrent
+            ? "px-3.5 py-1.5 rounded-xl text-xs font-bold transition shadow bg-sky-600 text-white flex items-center gap-1.5"
+            : "px-3.5 py-1.5 rounded-xl text-xs font-medium text-slate-600 hover:text-slate-900 hover:bg-sky-50 transition flex items-center gap-1.5";
+        }
+      });
+
+      window.showQuickAlert(`Loaded 3D Module: ${window.topicsData[subjectKey].title}`);
+    };
+
+    // Initialize Everything on Window Load
+    window.addEventListener('load', () => {
+      if (window.lucide && typeof window.lucide.createIcons === 'function') {
+        window.lucide.createIcons();
+      }
+      window.initThreeEngine();
+      window.initAnnotationCanvas();
+    });
+  </script>
+</body>
+</html>
